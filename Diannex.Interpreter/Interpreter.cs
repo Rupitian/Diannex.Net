@@ -95,9 +95,9 @@ namespace Diannex.Interpreter
 
             #region Stack Instructions
             if (inst.Opcode == Opcode.Save)
-                saveRegister = stack.Pop();
+                saveRegister = stack.Peek();
             if (inst.Opcode == Opcode.Load)
-                stack.Push(saveRegister);
+                stack.Push(new Value(saveRegister));
 
             if (inst.Opcode == Opcode.PushUndefined)
                 stack.Push(new Value(null, Value.ValueType.Undefined));
@@ -129,7 +129,7 @@ namespace Diannex.Interpreter
                 var indx = stack.Pop();
                 var val = stack.Pop();
                 ((Value[])arr.Data)[indx.Data] = val;
-                stack.Push(val);
+                stack.Push(arr);
             }
 
             if (inst.Opcode == Opcode.SetVarGlobal)
@@ -141,9 +141,16 @@ namespace Diannex.Interpreter
             {
                 var val = stack.Pop();
                 if (inst.Arg1 >= localVarStore.Count)
+                {
+                    int count = inst.Arg1 - localVarStore.Count - 1;
+                    for (int i = 0; i < count; i++)
+                        localVarStore.Add(new Value(null, Value.ValueType.Undefined));
                     localVarStore.Add(val);
+                }
                 else
+                {
                     localVarStore[inst.Arg1] = val;
+                }
             }
             if (inst.Opcode == Opcode.PushVarGlobal)
                 stack.Push(GlobalVariableStore[Binary.StringTable[inst.Arg1]]);
@@ -317,7 +324,7 @@ namespace Diannex.Interpreter
             if (inst.Opcode == Opcode.Call)
             {
                 Value[] val = new Value[inst.Arg2];
-                for (int i = inst.Arg2-1; i >= 0; i--)
+                for (int i = 0; i < inst.Arg2; i++)
                 {
                     val[i] = stack.Pop();
                 }
@@ -334,7 +341,7 @@ namespace Diannex.Interpreter
             {
                 string name = Binary.StringTable[inst.Arg1];
                 Value[] val = new Value[inst.Arg2];
-                for (int i = inst.Arg2-1; i >= 0; i--)
+                for (int i = 0; i < inst.Arg2; i++)
                 {
                     val[i] = stack.Pop();
                 }
@@ -355,12 +362,10 @@ namespace Diannex.Interpreter
                 if (!InChoice)
                     throw new InterpreterRuntimeException("Attempted to add a choice when no choice is being processed!");
 
-                // TODO: Yell at Colin for using a 1 in place of 100% when everything else using integers
-                // ALSO TODO: Figure out why the interpreter is trying to run text
                 var chance = stack.Pop();
                 var text = stack.Pop();
                 var rand = new Random();
-                if ((int)chance.Data == 1 || rand.Next(0, 100) < (int)chance.Data)
+                if ((double)chance.Data == 1 || rand.NextDouble() < (double)chance.Data)
                     Choices.Add((ip + inst.Arg1, text.Data));
             }
             if (inst.Opcode == Opcode.ChoiceAddTruthy)
@@ -372,7 +377,7 @@ namespace Diannex.Interpreter
                 var text = stack.Pop();
                 var condition = stack.Pop();
                 var rand = new Random();
-                if ((bool)condition && ((int)chance.Data == 1 || rand.Next(0, 100) < (int)chance.Data))
+                if ((bool)condition && ((double)chance.Data == 1 || rand.NextDouble() < (double)chance.Data))
                 {
                     Choices.Add((ip + inst.Arg1, text.Data));
                 }

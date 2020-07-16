@@ -24,6 +24,12 @@ namespace Diannex.Interpreter
             Type = type;
         }
 
+        public Value(Value other)
+        {
+            Data = other.Data;
+            Type = other.Type;
+        }
+
         public static Value operator +(Value a)
         {
             if (a.Type != ValueType.Int32 && a.Type != ValueType.Double)
