@@ -2,9 +2,8 @@
 using System.IO;
 using System.IO.Compression;
 using System.Collections.Generic;
-//using zlib;
 
-namespace Diannex.Interpreter
+namespace Diannex.NET
 {
     public class Binary
     {

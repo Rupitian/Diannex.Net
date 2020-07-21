@@ -3,9 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30225.117
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Diannex.Interpreter", "Diannex.Interpreter\Diannex.Interpreter.csproj", "{A63D4F30-ABF1-453F-98F5-C727E082045A}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Diannex.Tests", "Diannex.Tests\Diannex.Tests.csproj", "{221E613A-E854-4CB8-A8EC-27CC91F22838}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Diannex.NET", "Diannex.NET\Diannex.NET.csproj", "{A63D4F30-ABF1-453F-98F5-C727E082045A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -17,10 +15,6 @@ Global
 		{A63D4F30-ABF1-453F-98F5-C727E082045A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A63D4F30-ABF1-453F-98F5-C727E082045A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A63D4F30-ABF1-453F-98F5-C727E082045A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{221E613A-E854-4CB8-A8EC-27CC91F22838}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{221E613A-E854-4CB8-A8EC-27CC91F22838}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{221E613A-E854-4CB8-A8EC-27CC91F22838}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{221E613A-E854-4CB8-A8EC-27CC91F22838}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

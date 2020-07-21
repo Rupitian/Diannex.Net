@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Diannex.Interpreter
+namespace Diannex.NET
 {
     // TODO: Comment better than just arguments
     public enum Opcode

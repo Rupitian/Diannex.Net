@@ -1,9 +1,13 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Diannex.Interpreter
+namespace Diannex.NET
 {
     public class Interpreter
     {
@@ -25,6 +29,7 @@ namespace Diannex.Interpreter
         private List<Value> localVarStore;
         private Stack<(int, Stack<Value>, List<Value>)> callStack;
         private Dictionary<string, Func<Value[], Value>> externalFuncs;
+        private List<(double, int)> chooseOptions;
 
         public Interpreter(Binary binary)
         {
@@ -46,6 +51,7 @@ namespace Diannex.Interpreter
             callStack = new Stack<(int, Stack<Value>, List<Value>)>();
             Choices = new List<(int, string)>();
             externalFuncs = new Dictionary<string, Func<Value[], Value>>();
+            chooseOptions = new List<(double, int)>();
         }
 
         public void RegisterCommand(string cmdName, Func<Value[], Value> func)
@@ -365,6 +371,7 @@ namespace Diannex.Interpreter
                 var chance = stack.Pop();
                 var text = stack.Pop();
                 var rand = new Random();
+                // TODO: Promote chance calculations to callbacks
                 if ((double)chance.Data == 1 || rand.NextDouble() < (double)chance.Data)
                     Choices.Add((ip + inst.Arg1, text.Data));
             }
@@ -377,6 +384,7 @@ namespace Diannex.Interpreter
                 var text = stack.Pop();
                 var condition = stack.Pop();
                 var rand = new Random();
+                // TODO: Promote chance calculations to callbacks
                 if ((bool)condition && ((double)chance.Data == 1 || rand.NextDouble() < (double)chance.Data))
                 {
                     Choices.Add((ip + inst.Arg1, text.Data));
@@ -393,9 +401,32 @@ namespace Diannex.Interpreter
                 Paused = true;
             }
 
-            if (inst.Opcode == Opcode.ChooseAdd || inst.Opcode == Opcode.ChooseAddTruthy || inst.Opcode == Opcode.ChooseSel)
+            if (inst.Opcode == Opcode.ChooseAdd || inst.Opcode == Opcode.ChooseAddTruthy)
             {
-                throw new NotImplementedException("Choose not yet implemented!");
+                var chance = stack.Pop();
+                var condition = new Value(1, Value.ValueType.Int32);
+                if (inst.Opcode == Opcode.ChooseAddTruthy)
+                    condition = stack.Pop();
+                if ((bool)condition)
+                    chooseOptions.Add((chance.Data, ip + inst.Arg1));
+            }
+
+            if (inst.Opcode == Opcode.ChooseSel)
+            {
+                // TODO: Promote to callbacks
+                double sum =
+                    (from i in chooseOptions
+                     select i.Item1).Sum();
+                var remaining = new Random().NextDouble() * sum;
+                foreach (var (weight, addr) in chooseOptions)
+                {
+                    remaining -= weight;
+                    if (remaining < 0)
+                    {
+                        instructionPointer = addr;
+                        break;
+                    }
+                }
             }
 
             if (inst.Opcode == Opcode.TextRun)
@@ -493,12 +524,145 @@ namespace Diannex.Interpreter
             while (Binary.Instructions[idx].Opcode != Opcode.Exit && Binary.Instructions[idx].Opcode != Opcode.Return)
             {
                 var inst = Binary.Instructions[idx];
+
+                d.Append(ToAssembledName(inst.Opcode));
+
+                switch (inst.Opcode)
+                {
+                    case Opcode.PushInt:
+                        d.Append($" #{inst.Arg1}");
+                        break;
+                    case Opcode.FreeLocal:
+                    case Opcode.MakeArray:
+                    case Opcode.SetVarLocal:
+                    case Opcode.PushVarLocal:
+                        d.Append($" #${inst.Arg1:X}");
+                        break;
+                    case Opcode.Jump:
+                    case Opcode.JumpTruthy:
+                    case Opcode.JumpFalsey:
+                        d.Append($" {(inst.Arg1 > -1 ? "+" : "")}{inst.Arg1}");
+                        break;
+                    case Opcode.PushDouble:
+                        d.Append($" #{inst.ArgDouble}");
+                        break;
+                    case Opcode.PushBinaryString:
+                    case Opcode.PushBinaryInterpolatedString:
+                    case Opcode.SetVarGlobal:
+                    case Opcode.PushVarGlobal:
+                    case Opcode.Call:
+                    case Opcode.CallExternal:
+                        d.Append($" &\"{Binary.StringTable[inst.Arg1]}\"");
+                        break;
+                    case Opcode.PushString:
+                    case Opcode.PushInterpolatedString:
+                        d.Append($" @\"{Binary.TranslationTable[inst.Arg1]}\"");
+                        break;
+                }
+
+                switch (inst.Opcode)
+                {
+                    case Opcode.PushInterpolatedString:
+                    case Opcode.PushBinaryInterpolatedString:
+                    case Opcode.Call:
+                    case Opcode.CallExternal:
+                        d.Append($", #{inst.Arg2}");
+                        break;
+                }
+
+                d.Append(Environment.NewLine);
+
                 // TODO: Properly check what arguments are actually valid, or if we're using arguments in general
-                d.AppendLine($"{idx}: {inst.Opcode} [{inst.Arg1}, {inst.Arg2}] [{inst.ArgDouble}]");
+                //d.AppendLine($"{idx}: {inst.Opcode} [{inst.Arg1}, {inst.Arg2}] [{inst.ArgDouble}]");
                 idx++;
             }
             d.AppendLine($"{idx}: {Binary.Instructions[idx].Opcode}");
             return d.ToString();
+        }
+
+        public void DissassembleToFile(string path)
+        {
+            List<(int, int)> list = new List<(int, int)>();
+            list.AddRange(Binary.Functions);
+            list.AddRange(Binary.Scenes);
+            list.Sort((t1, t2) => t1.Item2.CompareTo(t2.Item2));
+
+            OrderedDictionary result = new OrderedDictionary();
+
+            foreach (var (symbol, funcPointer) in list)
+            {
+                result.Add(Binary.StringTable[symbol], "  " + Dissassemble(funcPointer).Replace(Environment.NewLine, Environment.NewLine + "  "));
+            }
+
+            using StreamWriter writer = new StreamWriter(path, false);
+            foreach (DictionaryEntry elem in result)
+            {
+                writer.WriteLine($"{elem.Key}:\n{elem.Value}");
+            }
+        }
+
+        private string ToAssembledName(Opcode op)
+        {
+            return op switch
+            {
+                Opcode.Nop => "nop",
+                Opcode.FreeLocal => "freeloc",
+                Opcode.Save => "save",
+                Opcode.Load => "load",
+                Opcode.PushUndefined => "pushu",
+                Opcode.PushInt => "pushi",
+                Opcode.PushDouble => "pushd",
+                Opcode.PushString => "pushs",
+                Opcode.PushInterpolatedString => "pushints",
+                Opcode.PushBinaryString => "pushbs",
+                Opcode.PushBinaryInterpolatedString => "pushbints",
+                Opcode.MakeArray => "makearr",
+                Opcode.PushArrayIndex => "pusharrind",
+                Opcode.SetArrayIndex => "setarrind",
+                Opcode.SetVarGlobal => "setvarglb",
+                Opcode.SetVarLocal => "setvarloc",
+                Opcode.PushVarGlobal => "pushvarglb",
+                Opcode.PushVarLocal => "pushvarloc",
+                Opcode.Pop => "pop",
+                Opcode.Duplicate => "dup",
+                Opcode.Duplicate2 => "dup2",
+                Opcode.Addition => "add",
+                Opcode.Subtraction => "sub",
+                Opcode.Multiply => "mul",
+                Opcode.Divide => "div",
+                Opcode.Modulo => "mod",
+                Opcode.Negate => "neg",
+                Opcode.Invert => "inv",
+                Opcode.BitLeftShift => "bitls",
+                Opcode.BitRightShift => "bitrs",
+                Opcode.BitAnd => "bitand",
+                Opcode.BitOr => "bitor",
+                Opcode.BitExclusiveOr => "bitxor",
+                Opcode.BitNegate => "bitneg",
+                Opcode.Power => "pow",
+                Opcode.CompareEqual => "cmpeq",
+                Opcode.CompareGreaterThan => "cmpgt",
+                Opcode.CompareLessThan => "cmplt",
+                Opcode.CompareGreaterThanEqual => "cmpgte",
+                Opcode.CompareLessThanEqual => "cmplte",
+                Opcode.CompareNotEqual => "cmpneq",
+                Opcode.Jump => "jmp",
+                Opcode.JumpTruthy => "jmpt",
+                Opcode.JumpFalsey => "jmpf",
+                Opcode.Exit => "exit",
+                Opcode.Return => "ret",
+                Opcode.Call => "call",
+                Opcode.CallExternal => "callext",
+                Opcode.ChoiceBegin => "choicebeg",
+                Opcode.ChoiceAdd => "choiceadd",
+                Opcode.ChoiceAddTruthy => "choiceaddt",
+                Opcode.ChoiceSelect => "choicesel",
+                Opcode.ChooseAdd => "chooseadd",
+                Opcode.ChooseAddTruthy => "chooseaddt",
+                Opcode.ChooseSel => "choosesel",
+                Opcode.TextRun => "textrun",
+                _ => "nop",
+            };
         }
 
         public class InterpreterRuntimeException : Exception
