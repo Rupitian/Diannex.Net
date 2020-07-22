@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -58,6 +57,11 @@ namespace Diannex.NET
         {
             // TODO: Sanitize cmdName?
             externalFuncs[cmdName] = func;
+        }
+
+        public void RegisterCommand(string cmdName, Action<Value[]> func)
+        {
+            externalFuncs[cmdName] = (v) => { func(v); return new Value(null, Value.ValueType.Undefined); };
         }
 
         public void RunScene(string sceneName)
@@ -335,7 +339,7 @@ namespace Diannex.NET
                     val[i] = stack.Pop();
                 }
                 callStack.Push((instructionPointer, stack, localVarStore));
-                instructionPointer = inst.Arg1;
+                instructionPointer = Binary.Functions[inst.Arg1].Item2;
                 stack = new Stack<Value>();
                 localVarStore = new List<Value>();
                 for (int i = 0; i < inst.Arg2; i++)
@@ -404,29 +408,37 @@ namespace Diannex.NET
             if (inst.Opcode == Opcode.ChooseAdd || inst.Opcode == Opcode.ChooseAddTruthy)
             {
                 var chance = stack.Pop();
-                var condition = new Value(1, Value.ValueType.Int32);
-                if (inst.Opcode == Opcode.ChooseAddTruthy)
-                    condition = stack.Pop();
-                if ((bool)condition)
+                if (inst.Opcode != Opcode.ChooseAddTruthy || (bool)stack.Pop())
                     chooseOptions.Add((chance.Data, ip + inst.Arg1));
             }
 
             if (inst.Opcode == Opcode.ChooseSel)
             {
                 // TODO: Promote to callbacks
-                double sum =
-                    (from i in chooseOptions
-                     select i.Item1).Sum();
-                var remaining = new Random().NextDouble() * sum;
-                foreach (var (weight, addr) in chooseOptions)
+                double sum = 0;
+                double[] fixedWeights = new double[chooseOptions.Count];
+                for (int i = 0; i < chooseOptions.Count; i++)
                 {
-                    remaining -= weight;
-                    if (remaining < 0)
+                    fixedWeights[i] = sum;
+                    sum += chooseOptions[i].Item1;
+                }
+
+                var random = new Random().NextDouble() * sum;
+                int selection = -1;
+                double previous = -1;
+
+                for (int i = 0; i < chooseOptions.Count; i++)
+                {
+                    var current = fixedWeights[i];
+                    if (random >= current && current > previous)
                     {
-                        instructionPointer = addr;
-                        break;
+                        selection = i;
+                        previous = current;
                     }
                 }
+
+                // TODO: Check if selection is valid
+                instructionPointer = chooseOptions[selection].Item2;
             }
 
             if (inst.Opcode == Opcode.TextRun)
@@ -550,9 +562,13 @@ namespace Diannex.NET
                     case Opcode.PushBinaryInterpolatedString:
                     case Opcode.SetVarGlobal:
                     case Opcode.PushVarGlobal:
-                    case Opcode.Call:
-                    case Opcode.CallExternal:
                         d.Append($" &\"{Binary.StringTable[inst.Arg1]}\"");
+                        break;
+                    case Opcode.Call:
+                        d.Append($" {Binary.StringTable[Binary.Functions[inst.Arg1].Item1]}");
+                        break;
+                    case Opcode.CallExternal:
+                        d.Append($" {Binary.StringTable[inst.Arg1]}");
                         break;
                     case Opcode.PushString:
                     case Opcode.PushInterpolatedString:
@@ -576,7 +592,7 @@ namespace Diannex.NET
                 //d.AppendLine($"{idx}: {inst.Opcode} [{inst.Arg1}, {inst.Arg2}] [{inst.ArgDouble}]");
                 idx++;
             }
-            d.AppendLine($"{idx}: {Binary.Instructions[idx].Opcode}");
+            d.AppendLine(ToAssembledName(Binary.Instructions[idx].Opcode));
             return d.ToString();
         }
 

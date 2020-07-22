@@ -60,9 +60,11 @@ namespace Diannex.NET
                     uint decompSize = br.ReadUInt32();
                     uint compSize = br.ReadUInt32();
                     block = new byte[decompSize];
-                    byte[] compressedData = br.ReadBytes((int)compSize);
+                    _ = br.ReadBytes(2); // DeflateStream doesn't handle the zlib header, so we're gonna skip it
+                    byte[] compressedData = br.ReadBytes((int)compSize - 2);
                     using (DeflateStream decompStream = new DeflateStream(new MemoryStream(compressedData), CompressionMode.Decompress))
                     {
+                        
                         decompStream.CopyTo(new MemoryStream(block), (int)decompSize);
                     }
                 }
@@ -71,36 +73,6 @@ namespace Diannex.NET
                     uint size = br.ReadUInt32();
                     block = br.ReadBytes((int)size);
                 }
-
-                /*uint blockSize = br.ReadUInt32();
-                var pBlock = br.ReadBytes((int)blockSize);
-
-                if (compressed)
-                {
-                    using (MemoryStream oMemStream = new MemoryStream())
-                    {
-                        using (ZOutputStream oZStream = new ZOutputStream(oMemStream))
-                        {
-                            using (Stream inMemStream = new MemoryStream(pBlock))
-                            {
-                                byte[] buf = new byte[2000];
-                                int len;
-                                while ((len = inMemStream.Read(buf, 0, 2000)) > 0)
-                                {
-                                    oZStream.Write(buf, 0, len);
-                                }
-                                oZStream.Flush();
-                                oZStream.finish();
-                                block = oMemStream.ToArray();
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    block = new byte[pBlock.Length];
-                    pBlock.CopyTo(block, 0);
-                }*/
             }
 
             using (BinaryReader br = new BinaryReader(new MemoryStream(block)))

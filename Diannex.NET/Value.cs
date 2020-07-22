@@ -24,6 +24,18 @@ namespace Diannex.NET
             Type = type;
         }
 
+        public Value() : this(null, ValueType.Undefined)
+        {}
+
+        public Value(string data) : this(data, ValueType.String)
+        {}
+
+        public Value(int data) : this(data, ValueType.Int32)
+        {}
+
+        public Value(double data) : this(data, ValueType.Double)
+        {}
+
         public Value(Value other)
         {
             Data = other.Data;
