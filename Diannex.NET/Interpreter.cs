@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -53,6 +54,13 @@ namespace Diannex.NET
             chooseOptions = new List<(double, int)>();
         }
 
+        public void LoadTranslationFile(string path)
+        {
+            using StreamReader reader = new StreamReader(File.OpenRead(path));
+            Binary.TranslationTable = reader.ReadToEnd().Split('\n').ToList();
+            Binary.TranslationLoaded = true;
+        }
+
         public void RegisterCommand(string cmdName, Func<Value[], Value> func)
         {
             // TODO: Sanitize cmdName?
@@ -61,11 +69,16 @@ namespace Diannex.NET
 
         public void RegisterCommand(string cmdName, Action<Value[]> func)
         {
-            externalFuncs[cmdName] = (v) => { func(v); return new Value(null, Value.ValueType.Undefined); };
+            externalFuncs[cmdName] = (v) => { func(v); return new Value(); };
         }
 
         public void RunScene(string sceneName)
         {
+            if (!Binary.TranslationLoaded && Binary.TranslationTable.Count == 0)
+            {
+                Console.Error.WriteLine("[WARNING]: Currently no translations have been loaded! The program will crash when trying to run dialogue!");
+            }
+
             var sceneId = LookupScene(sceneName);
             var scene = Binary.Scenes[sceneId];
             instructionPointer = scene.Item2;

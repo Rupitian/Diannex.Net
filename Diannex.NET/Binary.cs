@@ -7,18 +7,18 @@ namespace Diannex.NET
 {
     public class Binary
     {
-        public bool InternalTranslation;
+        public bool TranslationLoaded;
         public List<string> StringTable; // [ID]: <string>
         public List<string> TranslationTable;
-        public List<Instruction> Instructions;
+        internal List<Instruction> Instructions;
 
-        public List<(int, int)> Scenes; // TODO: Promote to object
-        public List<(int, int)> Functions; // TODO: Promote to object
-        public List<(int, int, int)> Definitions; // TODO: Promote to object
+        internal List<(int, int)> Scenes; // TODO: Promote to object
+        internal List<(int, int)> Functions; // TODO: Promote to object
+        internal List<(int, int, int)> Definitions; // TODO: Promote to object
 
         public Binary()
         {
-            InternalTranslation = true;
+            TranslationLoaded = false;
             StringTable = new List<string>();
             TranslationTable = new List<string>();
             Instructions = new List<Instruction>();
@@ -52,7 +52,7 @@ namespace Diannex.NET
                 compressed = Convert.ToBoolean(flags & 0x01);
                 internalTranslationFile = Convert.ToBoolean(flags >> 1);
 
-                b.InternalTranslation = internalTranslationFile;
+                b.TranslationLoaded = internalTranslationFile;
 
                 // TODO: Read in actual blocks to save memory?
                 if (compressed)
