@@ -87,7 +87,7 @@ namespace Diannex.NET
                         return new Value((double)result);
                     else if (returnType == typeof(int))
                         return new Value((int)result);
-                    throw new InvalidCastException($"Return type of managed method '{func.Function.Name}' aren't castable to an unmanaged Value");
+                    throw new InvalidCastException($"Return type of managed method '{func.Function.Name}' isn't castable to an unmanaged Value");
                 });
             }
         }
