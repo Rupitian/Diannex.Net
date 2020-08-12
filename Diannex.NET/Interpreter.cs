@@ -12,14 +12,14 @@ namespace Diannex.NET
     public class Interpreter
     {
         public delegate bool ChanceHandler(double chance);
-        public delegate int WeightedChance(double[] chance);
+        public delegate int WeightedChanceHandler(double[] chance);
 
         public Binary Binary;
         public Dictionary<string, Value> GlobalVariableStore;
         public FunctionHandler FunctionHandler;
 
         public ChanceHandler ChanceCallback;
-        public WeightedChance WeightedChanceCallback;
+        public WeightedChanceHandler WeightedChanceCallback;
         public bool InChoice { get; private set; }
         public bool SelectChoice { get; private set; }
         public bool RunningText { get; private set; }
@@ -36,7 +36,7 @@ namespace Diannex.NET
         private Stack<(int, Stack<Value>, List<Value>)> callStack;
         private List<(double, int)> chooseOptions;
 
-        public Interpreter(Binary binary, FunctionHandler functionHandler, ChanceHandler chanceCallback = null, WeightedChance weightedChanceCallback = null)
+        public Interpreter(Binary binary, FunctionHandler functionHandler, ChanceHandler chanceCallback = null, WeightedChanceHandler weightedChanceCallback = null)
         {
             Binary = binary;
             GlobalVariableStore = new Dictionary<string, Value>();
