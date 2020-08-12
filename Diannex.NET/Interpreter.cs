@@ -11,9 +11,15 @@ namespace Diannex.NET
 {
     public class Interpreter
     {
+        public delegate bool ChanceHandler(double chance);
+        public delegate int WeightedChance(double[] chance);
+
         public Binary Binary;
         public Dictionary<string, Value> GlobalVariableStore;
+        public FunctionHandler FunctionHandler;
 
+        public ChanceHandler ChanceCallback;
+        public WeightedChance WeightedChanceCallback;
         public bool InChoice { get; private set; }
         public bool SelectChoice { get; private set; }
         public bool RunningText { get; private set; }
@@ -21,23 +27,60 @@ namespace Diannex.NET
         public bool SceneCompleted { get; private set; }
         public string CurrentScene { get; private set; }
         public string CurrentText { get; private set; }
-        public List<(int /* Relative Address to jump to */, string /* Text to display to the user */)> Choices { get; private set; } // TODO: Promote to object
+        public List<(int /* Relative Address to jump to */, string /* Text to display to the user */)> Choices { get; private set; }
 
         private int instructionPointer;
         private Stack<Value> stack;
         private Value saveRegister;
         private List<Value> localVarStore;
         private Stack<(int, Stack<Value>, List<Value>)> callStack;
-        private Dictionary<string, Func<Value[], Value>> externalFuncs;
         private List<(double, int)> chooseOptions;
 
-        public Interpreter(Binary binary)
+        public Interpreter(Binary binary, FunctionHandler functionHandler, ChanceHandler chanceCallback = null, WeightedChance weightedChanceCallback = null)
         {
             Binary = binary;
             GlobalVariableStore = new Dictionary<string, Value>();
             InChoice = false;
             SelectChoice = false;
             RunningText = false;
+            
+            if (chanceCallback == null)
+                ChanceCallback = (d) => d == 1 || new Random().NextDouble() < d;
+            else
+                ChanceCallback = chanceCallback;
+
+            if (weightedChanceCallback == null)
+            {
+                WeightedChanceCallback = (weights) =>
+                {
+                    double sum = 0;
+                    double[] fixedWeights = new double[weights.Length];
+                    for (int i = 0; i < weights.Length; i++)
+                    {
+                        fixedWeights[i] = sum;
+                        sum += weights[i];
+                    }
+
+                    var random = new Random().NextDouble() * sum;
+                    int selection = -1;
+                    double previous = -1;
+
+                    for (int i = 0; i < fixedWeights.Length; i++)
+                    {
+                        var current = fixedWeights[i];
+                        if (random >= current && current > previous)
+                        {
+                            selection = i;
+                            previous = current;
+                        }
+                    }
+                    return selection;
+                };
+            }
+            else
+            {
+                WeightedChanceCallback = weightedChanceCallback;
+            }
 
             CurrentScene = null;
             SceneCompleted = false;
@@ -50,7 +93,7 @@ namespace Diannex.NET
             localVarStore = new List<Value>();
             callStack = new Stack<(int, Stack<Value>, List<Value>)>();
             Choices = new List<(int, string)>();
-            externalFuncs = new Dictionary<string, Func<Value[], Value>>();
+            FunctionHandler = functionHandler;
             chooseOptions = new List<(double, int)>();
         }
 
@@ -59,17 +102,6 @@ namespace Diannex.NET
             using StreamReader reader = new StreamReader(File.OpenRead(path));
             Binary.TranslationTable = reader.ReadToEnd().Split('\n').ToList();
             Binary.TranslationLoaded = true;
-        }
-
-        public void RegisterCommand(string cmdName, Func<Value[], Value> func)
-        {
-            // TODO: Sanitize cmdName?
-            externalFuncs[cmdName] = func;
-        }
-
-        public void RegisterCommand(string cmdName, Action<Value[]> func)
-        {
-            externalFuncs[cmdName] = (v) => { func(v); return new Value(); };
         }
 
         public void RunScene(string sceneName)
@@ -88,7 +120,8 @@ namespace Diannex.NET
 
         public void ChooseChoice(int idx)
         {
-            // TODO: Decide whether nor not to stick to C# exceptions or use Interpreter*Exceptions
+            if (idx >= Choices.Count)
+                throw new IndexOutOfRangeException($"Choice at index {idx} is outside of the range of choices.");
             var choice = Choices[idx];
             instructionPointer = choice.Item1;
             SelectChoice = false;
@@ -317,7 +350,6 @@ namespace Diannex.NET
                 instructionPointer = ip + inst.Arg1;
             if (inst.Opcode == Opcode.Exit)
             {
-                // TODO: Gracefully exit when at the end of the callstack
                 localVarStore.Clear();
                 if (callStack.Count == 0)
                 {
@@ -368,7 +400,7 @@ namespace Diannex.NET
                 {
                     val[i] = stack.Pop();
                 }
-                stack.Push(externalFuncs[name](val));
+                stack.Push(FunctionHandler.Invoke(name, val));
             }
             #endregion
 
@@ -388,8 +420,7 @@ namespace Diannex.NET
                 var chance = stack.Pop();
                 var text = stack.Pop();
                 var rand = new Random();
-                // TODO: Promote chance calculations to callbacks
-                if ((double)chance.Data == 1 || rand.NextDouble() < (double)chance.Data)
+                if (ChanceCallback((double)chance.Data))
                     Choices.Add((ip + inst.Arg1, text.Data));
             }
             if (inst.Opcode == Opcode.ChoiceAddTruthy)
@@ -401,8 +432,7 @@ namespace Diannex.NET
                 var text = stack.Pop();
                 var condition = stack.Pop();
                 var rand = new Random();
-                // TODO: Promote chance calculations to callbacks
-                if ((bool)condition && ((double)chance.Data == 1 || rand.NextDouble() < (double)chance.Data))
+                if ((bool)condition && ChanceCallback((double)chance.Data))
                 {
                     Choices.Add((ip + inst.Arg1, text.Data));
                 }
@@ -427,30 +457,9 @@ namespace Diannex.NET
 
             if (inst.Opcode == Opcode.ChooseSel)
             {
-                // TODO: Promote to callbacks
-                double sum = 0;
-                double[] fixedWeights = new double[chooseOptions.Count];
-                for (int i = 0; i < chooseOptions.Count; i++)
-                {
-                    fixedWeights[i] = sum;
-                    sum += chooseOptions[i].Item1;
-                }
-
-                var random = new Random().NextDouble() * sum;
-                int selection = -1;
-                double previous = -1;
-
-                for (int i = 0; i < chooseOptions.Count; i++)
-                {
-                    var current = fixedWeights[i];
-                    if (random >= current && current > previous)
-                    {
-                        selection = i;
-                        previous = current;
-                    }
-                }
-
-                // TODO: Check if selection is valid
+                var selection = WeightedChanceCallback(chooseOptions.Select(t => t.Item1).ToArray());
+                if (selection == -1 || selection >= chooseOptions.Count)
+                    throw new IndexOutOfRangeException($"Selection returned by WeightedChanceCallback was out of bounds. Selection: {selection}");
                 instructionPointer = chooseOptions[selection].Item2;
             }
 
@@ -601,8 +610,6 @@ namespace Diannex.NET
 
                 d.Append(Environment.NewLine);
 
-                // TODO: Properly check what arguments are actually valid, or if we're using arguments in general
-                //d.AppendLine($"{idx}: {inst.Opcode} [{inst.Arg1}, {inst.Arg2}] [{inst.ArgDouble}]");
                 idx++;
             }
             d.AppendLine(ToAssembledName(Binary.Instructions[idx].Opcode));

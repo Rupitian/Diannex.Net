@@ -12,9 +12,9 @@ namespace Diannex.NET
         public List<string> TranslationTable;
         internal List<Instruction> Instructions;
 
-        internal List<(int, int)> Scenes; // TODO: Promote to object
-        internal List<(int, int)> Functions; // TODO: Promote to object
-        internal List<(int, int, int)> Definitions; // TODO: Promote to object
+        internal List<(int, int)> Scenes;
+        internal List<(int, int)> Functions;
+        internal List<(int, int, int)> Definitions;
 
         public Binary()
         {
@@ -47,14 +47,11 @@ namespace Diannex.NET
                 }
 
                 var flags = br.ReadByte();
-                bool compressed, internalTranslationFile;
-                // (compressed | (internalTranslationFile << 1))
-                compressed = Convert.ToBoolean(flags & 0x01);
-                internalTranslationFile = Convert.ToBoolean(flags >> 1);
+                bool compressed = Convert.ToBoolean(flags & 0x01);
+                bool internalTranslationFile = Convert.ToBoolean(flags >> 1);
 
                 b.TranslationLoaded = internalTranslationFile;
 
-                // TODO: Read in actual blocks to save memory?
                 if (compressed)
                 {
                     uint decompSize = br.ReadUInt32();
