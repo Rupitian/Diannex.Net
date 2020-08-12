@@ -181,8 +181,8 @@ namespace Diannex.NET
             }
             if (inst.Opcode == Opcode.SetArrayIndex)
             {
-                var arr = stack.Pop();
                 var indx = stack.Pop();
+                var arr = stack.Pop();
                 var val = stack.Pop();
                 ((Value[])arr.Data)[indx.Data] = val;
                 stack.Push(arr);
