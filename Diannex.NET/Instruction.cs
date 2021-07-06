@@ -271,41 +271,4 @@ namespace Diannex.NET
         /// </summary>
         TextRun = 0x4E
     }
-
-    public class Instruction
-    {
-        public Opcode Opcode;
-        public int Arg1;
-        public int Arg2;
-        public double ArgDouble;
-
-        public Instruction(Opcode opcode)
-        {
-            Opcode = opcode;
-        }
-
-        public Instruction(Opcode opcode, int arg)
-        {
-            Opcode = opcode;
-            Arg1 = arg;
-            Arg2 = default;
-            ArgDouble = default;
-        }
-
-        public Instruction(Opcode opcode, int arg1, int arg2)
-        {
-            Opcode = opcode;
-            Arg1 = arg1;
-            Arg2 = arg2;
-            ArgDouble = default;
-        }
-
-        public Instruction(Opcode opcode, double arg)
-        {
-            Opcode = opcode;
-            Arg1 = default;
-            Arg2 = default;
-            ArgDouble = arg;
-        }
-    }
 }

@@ -10,7 +10,9 @@ namespace Diannex.NET
         public bool TranslationLoaded;
         public List<string> StringTable; // [ID]: <string>
         public List<string> TranslationTable;
-        internal List<Instruction> Instructions;
+
+        internal byte[] Instructions;
+        internal uint[] ExternalFunctions;
 
         internal List<(int, List<int>)> Scenes;
         internal List<(int, List<int>)> Functions;
@@ -21,7 +23,6 @@ namespace Diannex.NET
             TranslationLoaded = false;
             StringTable = new List<string>();
             TranslationTable = new List<string>();
-            Instructions = new List<Instruction>();
 
             Scenes = new List<(int, List<int>)>();
             Functions = new List<(int, List<int>)>();
@@ -41,7 +42,7 @@ namespace Diannex.NET
                 }
 
                 var ver = br.ReadByte();
-                if (ver != 2)
+                if (ver != 3)
                 {
                     throw new BinaryReaderException(path, "Binary file not for this version of Diannex.");
                 }
@@ -109,47 +110,10 @@ namespace Diannex.NET
                 }
 
                 uint bytecodeCount = br.ReadUInt32();
-                for (uint i = 0; i < bytecodeCount; i++)
-                {
-                    Instruction inst;
-                    Opcode opcode = (Opcode)br.ReadByte();
-                    switch (opcode)
-                    {
-                        case Opcode.FreeLocal:
-                        case Opcode.PushInt:
-                        case Opcode.PushString:
-                        case Opcode.PushBinaryString:
-                        case Opcode.MakeArray:
-                        case Opcode.SetVarGlobal:
-                        case Opcode.SetVarLocal:
-                        case Opcode.PushVarGlobal:
-                        case Opcode.PushVarLocal:
-                        case Opcode.Jump:
-                        case Opcode.JumpTruthy:
-                        case Opcode.JumpFalsey:
-                        case Opcode.ChoiceAdd:
-                        case Opcode.ChoiceAddTruthy:
-                        case Opcode.ChooseAdd:
-                        case Opcode.ChooseAddTruthy:
-                            inst = new Instruction(opcode, br.ReadInt32());
-                            break;
-                        case Opcode.PushInterpolatedString:
-                        case Opcode.PushBinaryInterpolatedString:
-                        case Opcode.Call:
-                        case Opcode.CallExternal:
-                            inst = new Instruction(opcode, br.ReadInt32(), br.ReadInt32());
-                            break;
-                        case Opcode.PushDouble:
-                            inst = new Instruction(opcode, br.ReadDouble());
-                            break;
-                        default:
-                            inst = new Instruction(opcode);
-                            break;
-                    }
-                    b.Instructions.Add(inst);
-                }
+                b.Instructions = br.ReadBytes((int)bytecodeCount);
 
                 uint internalStringCount = br.ReadUInt32();
+                Console.WriteLine("Internal String Count: {0}", internalStringCount);
                 for (uint i = 0; i < internalStringCount; i++)
                 {
                     List<char> strBytes = new List<char>();
@@ -162,6 +126,7 @@ namespace Diannex.NET
                 }
 
                 uint translationStringCount = br.ReadUInt32();
+                Console.WriteLine("Translation String Count: {0}", translationStringCount);
                 for (uint i = 0; i < translationStringCount; i++)
                 {
                     List<char> strBytes = new List<char>();
@@ -171,6 +136,14 @@ namespace Diannex.NET
                         strBytes.Add((char)byteCurrent);
                     }
                     b.TranslationTable.Add(new string(strBytes.ToArray()));
+                }
+
+                uint externalFunctionCount = br.ReadUInt32();
+                Console.WriteLine("External Function Count: {0}", externalFunctionCount);
+                b.ExternalFunctions = new uint[externalFunctionCount];
+                for (uint i = 0; i < externalFunctionCount; i++)
+                {
+                    b.ExternalFunctions[i] = br.ReadUInt32();
                 }
             }
             return b;
