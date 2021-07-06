@@ -207,17 +207,21 @@ namespace Diannex.NET
                 case Opcode.ChoiceAddTruthy:
                 case Opcode.ChooseAdd:
                 case Opcode.ChooseAddTruthy:
-                    arg1 = Binary.Instructions.ReadInt32(ref instructionPointer);
+                    arg1 = BitConverter.ToInt32(Binary.Instructions, instructionPointer);
+                    instructionPointer += 4;
                     break;
                 case Opcode.PushInterpolatedString:
                 case Opcode.PushBinaryInterpolatedString:
                 case Opcode.Call:
                 case Opcode.CallExternal:
-                    arg1 = Binary.Instructions.ReadInt32(ref instructionPointer);
-                    arg2 = Binary.Instructions.ReadInt32(ref instructionPointer);
+                    arg1 = BitConverter.ToInt32(Binary.Instructions, instructionPointer);
+                    instructionPointer += 4;
+                    arg2 = BitConverter.ToInt32(Binary.Instructions, instructionPointer);
+                    instructionPointer += 4;
                     break;
                 case Opcode.PushDouble:
-                    argDouble = Binary.Instructions.ReadDouble(ref instructionPointer);
+                    argDouble = BitConverter.ToDouble(Binary.Instructions, instructionPointer);
+                    instructionPointer += 8;
                     break;
             }
 
@@ -673,17 +677,21 @@ namespace Diannex.NET
                     case Opcode.ChoiceAddTruthy:
                     case Opcode.ChooseAdd:
                     case Opcode.ChooseAddTruthy:
-                        arg1 = Binary.Instructions.ReadInt32(ref idx);
+                        arg1 = BitConverter.ToInt32(Binary.Instructions, idx);
+                        idx += 4;
                         break;
                     case Opcode.PushInterpolatedString:
                     case Opcode.PushBinaryInterpolatedString:
                     case Opcode.Call:
                     case Opcode.CallExternal:
-                        arg1 = Binary.Instructions.ReadInt32(ref idx);
-                        arg2 = Binary.Instructions.ReadInt32(ref idx);
+                        arg1 = BitConverter.ToInt32(Binary.Instructions, idx);
+                        idx += 4;
+                        arg2 = BitConverter.ToInt32(Binary.Instructions, idx);
+                        idx += 4;
                         break;
                     case Opcode.PushDouble:
-                        argDouble = Binary.Instructions.ReadDouble(ref idx);
+                        argDouble = BitConverter.ToDouble(Binary.Instructions, idx);
+                        idx += 8;
                         break;
                 }
 
