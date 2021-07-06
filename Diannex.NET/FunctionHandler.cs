@@ -50,7 +50,7 @@ namespace Diannex.NET
                         if (propertyType == typeof(double))
                             return new Value((double)result);
                         if (propertyType == typeof(int))
-                            return new Vlaue((int)result);
+                            return new Value((int)result);
                         throw new InvalidCastException($"Return type of managed field '{prop.Property.Name}' isn't castable to an unmanaged Value");
                     });
                 }

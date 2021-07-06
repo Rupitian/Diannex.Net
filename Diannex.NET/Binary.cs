@@ -61,7 +61,7 @@ namespace Diannex.NET
                     block = new byte[decompSize];
                     _ = br.ReadBytes(2); // DeflateStream doesn't handle the zlib header, so we're gonna skip it
                     byte[] compressedData = br.ReadBytes((int)compSize - 2);
-                    using DeflateStream decompStream = new DeflateStream(new MemoryStream(compressedData), CompressionMode.Decompress)
+                    using DeflateStream decompStream = new DeflateStream(new MemoryStream(compressedData), CompressionMode.Decompress);
                     decompStream.CopyTo(new MemoryStream(block), (int)decompSize);
                 }
                 else
@@ -83,7 +83,7 @@ namespace Diannex.NET
                     {
                         bytecodeIndices.Add(br.ReadInt32());
                     }
-                    b.Scenes.Add(((int)symbol, bytecodeIndexes));
+                    b.Scenes.Add(((int)symbol, bytecodeIndices));
                 }
 
                 uint functionCount = br.ReadUInt32();
@@ -96,7 +96,7 @@ namespace Diannex.NET
                     {
                         bytecodeIndices.Add(br.ReadInt32());
                     }
-                    b.Functions.Add(((int)symbol, bytecodeIndexes));
+                    b.Functions.Add(((int)symbol, bytecodeIndices));
                 }
 
                 uint definitionCount = br.ReadUInt32();

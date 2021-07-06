@@ -130,7 +130,7 @@ namespace Diannex.NET
             var scene = Binary.Scenes[sceneId];
             var bytecodeIndexes = scene.Item2;
             instructionPointer = bytecodeIndexes[0];
-            for (int i = 1, flagIndex = 0; i < bytecodeIndexes.Length; i += 2, flagIndex++)
+            for (int i = 1, flagIndex = 0; i < bytecodeIndexes.Count; i += 2, flagIndex++)
             {
                 #region Flag Expression
                 callStack.Push((instructionPointer, stack, localVarStore));
@@ -154,8 +154,8 @@ namespace Diannex.NET
                 var name = stack.Pop();
                 #endregion
 
-                SetFlag((string)name.Data, value);
-                localVarStore.FlagMap.Add(flagIndex, (string)name.Data);
+                SetFlag(name.StringValue, value);
+                localVarStore.FlagMap.Add(flagIndex, name.StringValue);
             }
             instructionPointer = scene.Item2[0];
             CurrentScene = sceneName;
@@ -469,7 +469,7 @@ namespace Diannex.NET
                 var text = stack.Pop();
                 var rand = new Random();
                 if (ChanceCallback(chance.DoubleValue))
-                    Choices.Add((ip + inst.Arg1, text.Data));
+                    Choices.Add((ip + inst.Arg1, text.StringValue));
             }
             if (inst.Opcode == Opcode.ChoiceAddTruthy)
             {
@@ -482,7 +482,7 @@ namespace Diannex.NET
                 var rand = new Random();
                 if ((bool)condition && ChanceCallback(chance.DoubleValue))
                 {
-                    Choices.Add((ip + inst.Arg1, text.StringView));
+                    Choices.Add((ip + inst.Arg1, text.StringValue));
                 }
             }
             if (inst.Opcode == Opcode.ChoiceSelect)
