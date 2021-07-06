@@ -12,8 +12,8 @@ namespace Diannex.NET
         public List<string> TranslationTable;
         internal List<Instruction> Instructions;
 
-        internal List<(int, int)> Scenes;
-        internal List<(int, int)> Functions;
+        internal List<(int, List<int>)> Scenes;
+        internal List<(int, List<int>)> Functions;
         internal List<(int, int, int)> Definitions;
 
         public Binary()
@@ -23,8 +23,8 @@ namespace Diannex.NET
             TranslationTable = new List<string>();
             Instructions = new List<Instruction>();
 
-            Scenes = new List<(int, int)>();
-            Functions = new List<(int, int)>();
+            Scenes = new List<(int, List<int>)>();
+            Functions = new List<(int, List<int>)>();
             Definitions = new List<(int, int, int)>();
         }
 
@@ -41,7 +41,7 @@ namespace Diannex.NET
                 }
 
                 var ver = br.ReadByte();
-                if (ver != 1)
+                if (ver != 2)
                 {
                     throw new BinaryReaderException(path, "Binary file not for this version of Diannex.");
                 }
@@ -49,6 +49,8 @@ namespace Diannex.NET
                 var flags = br.ReadByte();
                 bool compressed = Convert.ToBoolean(flags & 0x01);
                 bool internalTranslationFile = Convert.ToBoolean(flags >> 1);
+
+                Console.WriteLine($"Binary File: {path}\nSignature: {sig[0]}{sig[1]}{sig[2]}\nVersion: {ver}\nCompressed?: {compressed}\nInternal Translation File?: {internalTranslationFile}");
 
                 b.TranslationLoaded = internalTranslationFile;
 
@@ -59,11 +61,8 @@ namespace Diannex.NET
                     block = new byte[decompSize];
                     _ = br.ReadBytes(2); // DeflateStream doesn't handle the zlib header, so we're gonna skip it
                     byte[] compressedData = br.ReadBytes((int)compSize - 2);
-                    using (DeflateStream decompStream = new DeflateStream(new MemoryStream(compressedData), CompressionMode.Decompress))
-                    {
-                        
-                        decompStream.CopyTo(new MemoryStream(block), (int)decompSize);
-                    }
+                    using DeflateStream decompStream = new DeflateStream(new MemoryStream(compressedData), CompressionMode.Decompress)
+                    decompStream.CopyTo(new MemoryStream(block), (int)decompSize);
                 }
                 else
                 {
@@ -78,16 +77,26 @@ namespace Diannex.NET
                 for (uint i = 0; i < sceneCount; i++)
                 {
                     var symbol = br.ReadUInt32();
-                    var bytecodeIndex = br.ReadInt32();
-                    b.Scenes.Add(((int)symbol, bytecodeIndex));
+                    var count = br.ReadUInt16();
+                    var bytecodeIndices = new List<int>();
+                    for (int x = 0; x < count; x++)
+                    {
+                        bytecodeIndices.Add(br.ReadInt32());
+                    }
+                    b.Scenes.Add(((int)symbol, bytecodeIndexes));
                 }
 
                 uint functionCount = br.ReadUInt32();
                 for (uint i = 0; i < functionCount; i++)
                 {
                     var symbol = br.ReadUInt32();
-                    var bytecodeIndex = br.ReadInt32();
-                    b.Functions.Add(((int)symbol, bytecodeIndex));
+                    var count = br.ReadUInt16();
+                    var bytecodeIndices = new List<int>();
+                    for (int x = 0; x < count; x++)
+                    {
+                        bytecodeIndices.Add(br.ReadInt32());
+                    }
+                    b.Functions.Add(((int)symbol, bytecodeIndexes));
                 }
 
                 uint definitionCount = br.ReadUInt32();
@@ -110,6 +119,7 @@ namespace Diannex.NET
                         case Opcode.PushInt:
                         case Opcode.PushString:
                         case Opcode.PushBinaryString:
+                        case Opcode.MakeArray:
                         case Opcode.SetVarGlobal:
                         case Opcode.SetVarLocal:
                         case Opcode.PushVarGlobal:

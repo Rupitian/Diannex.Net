@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Diannex.NET
 {
@@ -24,6 +23,67 @@ namespace Diannex.NET
                 where f.IsDefined(typeof(DiannexFunctionAttribute), false)
                 select new { Function = f, Attribute = (DiannexFunctionAttribute)f.GetCustomAttributes(typeof(DiannexFunctionAttribute), false)[0] };
 
+            var properties =
+                from a in AppDomain.CurrentDomain.GetAssemblies().AsParallel()
+                from t in a.GetTypes()
+                from f in t.GetProperties()
+                where f.IsDefined(typeof(DiannexPropertyAttribute), false)
+                select new { Property = f, Attribute = (DiannexPropertyAttribute)f.GetCustomAttributes(typeof(DiannexPropertyAttribute), false)[0] };
+
+            foreach (var prop in properties)
+            {
+                string getName = prop.Attribute.DiannexGetName;
+                string setName = prop.Attribute.DiannexSetName;
+                var propertyType = prop.Property.PropertyType;
+
+                if (!string.IsNullOrEmpty(getName))
+                {
+                    funcs.Add(getName, (args) =>
+                    {
+                        if (args.Length > 0) throw new ArgumentException("There should be no arguments when linking to a field!");
+                        var result = prop.Property.GetValue(null);
+
+                        if (result == null)
+                            return new Value();
+                        if (propertyType == typeof(string))
+                            return new Value((string)result);
+                        if (propertyType == typeof(double))
+                            return new Value((double)result);
+                        if (propertyType == typeof(int))
+                            return new Vlaue((int)result);
+                        throw new InvalidCastException($"Return type of managed field '{prop.Property.Name}' isn't castable to an unmanaged Value");
+                    });
+                }
+
+                if (!string.IsNullOrEmpty(setName))
+                {
+                    funcs.Add(setName, (args) =>
+                    {
+                        if (args.Length != 1) throw new ArgumentException($"Incorrect number of arguments applied to property!");
+                        var arg = args[0];
+                        if (propertyType == typeof(double))
+                        {
+                            prop.Property.SetValue(null, arg.DoubleValue);
+                            return new Value();
+                        }
+
+                        if (propertyType == typeof(int))
+                        {
+                            prop.Property.SetValue(null, arg.IntValue);
+                            return new Value();
+                        }
+
+                        if (propertyType == typeof(string))
+                        {
+                            prop.Property.SetValue(null, arg.StringValue);
+                            return new Value();
+                        }
+
+                        throw new ArgumentException($"Arguments to unmanaged '{setName}' do not match type of managed property '{prop.Property.Name}'");
+                    });
+                }
+            }
+
             foreach (var func in functions)
             {
                 string name = func.Attribute.DiannexName;
@@ -43,34 +103,30 @@ namespace Diannex.NET
                                 throw new ArgumentException($"Arguments to unamanged '{name}' do not match managed method '{func.Function.Name}'", param.Name);
 
                         }
+
                         var arg = args[i];
                         if (param.ParameterType == typeof(double))
                         {
                             if (arg.Type == Value.ValueType.Int32 || arg.Type == Value.ValueType.Double)
-                            {
-                                arguments.Add((double)arg.Data);
-                            }
-                            throw new ArgumentException($"Arguments to unamanged '{name}' do not match managed method '{func.Function.Name}'", param.Name);
+                                arguments.Add(arg.DoubleValue);
+                            else
+                                throw new ArgumentException($"Arguments to unamanged '{name}' do not match managed method '{func.Function.Name}'", param.Name);
                         }
                         else if (param.ParameterType == typeof(int))
                         {
                             if (arg.Type == Value.ValueType.Int32 || arg.Type == Value.ValueType.Double)
-                            {
-                                arguments.Add((int)arg.Data);
-                            }
-                            throw new ArgumentException($"Arguments to unamanged '{name}' do not match managed method '{func.Function.Name}'", param.Name);
+                                arguments.Add(arg.IntValue);
+                            else
+                                throw new ArgumentException($"Arguments to unamanged '{name}' do not match managed method '{func.Function.Name}'", param.Name);
                         }
                         else if (param.ParameterType == typeof(string))
                         {
-                            if (arg.Type == Value.ValueType.Int32 || arg.Type == Value.ValueType.Double)
-                            {
-                                arguments.Add($"{arg.Data}");
-                            }
-                            else if (arg.Type == Value.ValueType.String)
-                            {
-                                arguments.Add(arg.Data);
-                            }
-                            throw new ArgumentException($"Arguments to unamanged '{name}' do not match managed method '{func.Function.Name}'", param.Name);
+                            if (arg.Type == Value.ValueType.Int32 || arg.Type == Value.ValueType.Double || arg.Type == Value.ValueType.String)
+                                arguments.Add(arg.StringValue);
+                            else if (arg.Type == Value.ValueType.Undefined)
+                                arguments.Add(null);
+                            else
+                                throw new ArgumentException($"Arguments to unamanged '{name}' do not match managed method '{func.Function.Name}'", param.Name);
                         }
                         else
                         {
@@ -79,6 +135,7 @@ namespace Diannex.NET
                     }
 
                     var result = func.Function.Invoke(null, arguments.ToArray());
+
                     if (result == null)
                         return new Value();
                     if (returnType == typeof(string))
@@ -141,6 +198,19 @@ namespace Diannex.NET
         public DiannexFunctionAttribute(string diannexName)
         {
             DiannexName = diannexName;
+        }
+    }
+
+    [AttributeUsage(AttributeTargets.Property, Inherited = false, AllowMultiple = false)]
+    public sealed class DiannexPropertyAttribute : Attribute
+    {
+        public string DiannexGetName;
+        public string DiannexSetName;
+
+        public DiannexPropertyAttribute(string diannexGetName, string diannexSetName = null)
+        {
+            DiannexGetName = diannexGetName;
+            DiannexSetName = diannexSetName;
         }
     }
 }

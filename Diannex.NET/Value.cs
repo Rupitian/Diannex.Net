@@ -15,173 +15,252 @@ namespace Diannex.NET
             Array
         }
 
-        public dynamic Data;
-        public ValueType Type;
-
-        public Value(dynamic data, ValueType type)
+        public string StringValue
         {
-            Data = data;
+            get
+            {
+                return Type switch
+                {
+                    ValueType.String => stringValue,
+                    ValueType.Int32 => $"{intValue}",
+                    ValueType.Double => $"{doubleValue}",
+                    ValueType.Undefined => null,
+                    _ => throw new NotImplementedException(),
+                };
+            }
+        }
+        public int IntValue
+        {
+            get
+            {
+                return Type switch
+                {
+                    ValueType.Int32 => intValue,
+                    ValueType.Double => (int)doubleValue,
+                    _ => throw new NotImplementedException(),
+                };
+            }
+        }
+        public double DoubleValue
+        {
+            get
+            {
+                return Type switch
+                {
+                    ValueType.Int32 => (double)intValue,
+                    ValueType.Double => doubleValue,
+                    _ => throw new NotImplementedException(),
+                };
+            }
+        }
+        public Value[] ArrayValue
+        {
+            get
+            {
+                return Type switch
+                {
+                    ValueType.Array => arrayValue,
+                    _ => throw new NotImplementedException(),
+                };
+            }
+        }
+
+        private string stringValue = default;
+        private int intValue = default;
+        private double doubleValue = default;
+        private Value[] arrayValue = default;
+
+        public ValueType Type = ValueType.Undefined;
+
+        public Value()
+        { }
+
+        public Value(string data, ValueType type = ValueType.String)
+        {
+            stringValue = data;
             Type = type;
         }
 
-        public Value() : this(null, ValueType.Undefined)
-        {}
-
-        public Value(string data) : this(data, ValueType.String)
-        {}
-
-        public Value(int data) : this(data, ValueType.Int32)
-        {}
-
-        public Value(double data) : this(data, ValueType.Double)
-        {}
-
-        public Value(Value other)
+        public Value(int data, ValueType type = ValueType.Int32)
         {
-            Data = other.Data;
-            Type = other.Type;
+            intValue = data;
+            Type = type;
+        }
+
+        public Value(double data, ValueType type = ValueType.Double)
+        {
+            doubleValue = data;
+            Type = type;
+        }
+
+        public Value(Value[] data, ValueType type = ValueType.Array)
+        {
+            arrayValue = data;
+            Type = type;
+        }
+
+        public Value(Value that)
+        {
+            this.Type = that.Type;
+            this.stringValue = that.stringValue;
+            this.intValue = that.intValue;
+            this.doubleValue = that.doubleValue;
+            this.arrayValue = that.arrayValue;
         }
 
         public static Value operator +(Value a)
         {
-            if (a.Type != ValueType.Int32 && a.Type != ValueType.Double)
+            if (a.Type == ValueType.Int32)
             {
-                throw new ValueConversionException("Value is not a numerical!");
+                return new Value(+a.intValue, a.Type);
             }
 
-            return a;
+            if (a.Type == ValueType.Double)
+            {
+                return new Value(+a.doubleValue, a.Type);
+            }
+
+            throw new ValueConversionException("Value is not a numerical!");
         }
 
-        public static Value operator-(Value a)
+        public static Value operator -(Value a)
         {
-            if (a.Type != ValueType.Int32 && a.Type != ValueType.Double)
+            if (a.Type == ValueType.Int32)
             {
-                throw new ValueConversionException("Value is not a numerical!");
+                return new Value(-a.intValue, a.Type);
             }
 
-            return new Value(-a.Data, a.Type);
+            if (a.Type == ValueType.Double)
+            {
+                return new Value(-a.doubleValue, a.Type);
+            }
+
+            throw new ValueConversionException("Value is not a numerical!");
         }
 
-        public static Value operator+(Value a, Value b)
+        public static Value operator +(Value a, Value b)
         {
             if (a.Type == ValueType.String && b.Type == ValueType.String)
             {
-                return new Value(a.Data + b.Data, ValueType.String);
+                return new Value(a.stringValue + b.stringValue, ValueType.String);
             }
 
-            if (a.Type != ValueType.Int32 && a.Type != ValueType.Double)
+            if ((a.Type == ValueType.Int32 || a.Type == ValueType.Double) && (b.Type == ValueType.Int32 || b.Type == ValueType.Double))
             {
-                throw new ValueConversionException("Value is not a numerical!");
+                if (a.Type == ValueType.Double || b.Type == ValueType.Double)
+                {
+                    return new Value(a.doubleValue + b.doubleValue, ValueType.Double);
+                }
+                else
+                {
+                    return new Value(a.intValue + b.intValue, ValueType.Int32);
+                }
             }
-
-            if (b.Type != ValueType.Int32 && b.Type != ValueType.Double)
-            {
-                throw new ValueConversionException("Value is not a numerical!");
-            }
-
-            // Take the bigger type, or default to a's type if both are the same
-            return new Value(a.Data + b.Data, a.Type >= b.Type ? a.Type : b.Type);
+            
+            throw new ValueConversionException("Value is not a numerical!");
         }
 
         public static Value operator -(Value a, Value b)
         {
-            if (a.Type != ValueType.Int32 && a.Type != ValueType.Double)
+            if ((a.Type == ValueType.Int32 || a.Type == ValueType.Double) && (b.Type == ValueType.Int32 || b.Type == ValueType.Double))
             {
-                throw new ValueConversionException("Value is not a numerical!");
+                if (a.Type == ValueType.Double || b.Type == ValueType.Double)
+                {
+                    return new Value(a.doubleValue - b.doubleValue, ValueType.Double);
+                }
+                else
+                {
+                    return new Value(a.intValue - b.intValue, ValueType.Int32);
+                }
             }
 
-            if (b.Type != ValueType.Int32 && b.Type != ValueType.Double)
-            {
-                throw new ValueConversionException("Value is not a numerical!");
-            }
-
-            // Take the bigger type, or default to a's type if both are the same
-            return new Value(a.Data - b.Data, a.Type >= b.Type ? a.Type : b.Type);
+            throw new ValueConversionException("Value is not a numerical!");
         }
 
         public static Value operator *(Value a, Value b)
         {
-            if (a.Type != ValueType.Int32 && a.Type != ValueType.Double)
+            if ((a.Type == ValueType.Int32 || a.Type == ValueType.Double) && (b.Type == ValueType.Int32 || b.Type == ValueType.Double))
             {
-                throw new ValueConversionException("Value is not a numerical!");
+                if (a.Type == ValueType.Double || b.Type == ValueType.Double)
+                {
+                    return new Value(a.doubleValue * b.doubleValue, ValueType.Double);
+                }
+                else
+                {
+                    return new Value(a.intValue * b.intValue, ValueType.Int32);
+                }
             }
 
-            if (b.Type != ValueType.Int32 && b.Type != ValueType.Double)
-            {
-                throw new ValueConversionException("Value is not a numerical!");
-            }
-
-            // Take the bigger type, or default to a's type if both are the same
-            return new Value(a.Data * b.Data, a.Type >= b.Type ? a.Type : b.Type);
+            throw new ValueConversionException("Value is not a numerical!");
         }
 
         public static Value operator /(Value a, Value b)
         {
-            if (a.Type != ValueType.Int32 && a.Type != ValueType.Double)
+            if ((a.Type == ValueType.Int32 || a.Type == ValueType.Double) && (b.Type == ValueType.Int32 || b.Type == ValueType.Double))
             {
-                throw new ValueConversionException("Value is not a numerical!");
+                if (a.Type == ValueType.Double || b.Type == ValueType.Double)
+                {
+                    return new Value(a.doubleValue / b.doubleValue, ValueType.Double);
+                }
+                else
+                {
+                    return new Value(a.intValue / b.intValue, ValueType.Int32);
+                }
             }
 
-            if (b.Type != ValueType.Int32 && b.Type != ValueType.Double)
-            {
-                throw new ValueConversionException("Value is not a numerical!");
-            }
-
-            // Take the bigger type, or default to a's type if both are the same
-            return new Value(a.Data / b.Data, a.Type >= b.Type ? a.Type : b.Type);
+            throw new ValueConversionException("Value is not a numerical!");
         }
 
-        public static Value operator!(Value a)
+        public static Value operator !(Value a)
         {
             if (a.Type == ValueType.Double)
             {
-                double result = a.Data > 0 ? 0 : 1;
-                return new Value(result, ValueType.Double);
+                return new Value(a.doubleValue > 0 ? 0 : 1, ValueType.Double);
             }
 
             if (a.Type == ValueType.Int32)
             {
-                int result = a.Data > 0 ? 0 : 1;
-                return new Value(result, ValueType.Int32);
+                return new Value(a.intValue > 0 ? 0 : 1, ValueType.Int32);
             }
 
             if (a.Type == ValueType.String)
             {
-                int result = ((string)a.Data).Length > 0 ? 0 : 1;
-                return new Value(result, ValueType.Int32);
+                return new Value(a.stringValue.Length > 0 ? 0 : 1, ValueType.Int32);
             }
 
             if (a.Type == ValueType.Array)
             {
-                int result = ((Value[])a.Data).Length > 0 ? 0 : 1;
+                return new Value(a.arrayValue.Length > 0 ? 0 : 1, ValueType.Int32);
             }
 
             throw new ValueConversionException("Value is not invertable!");
         }
 
-        public static Value operator%(Value a, Value b)
+        public static Value operator %(Value a, Value b)
         {
-            if (a.Type != ValueType.Int32 && a.Type != ValueType.Double)
+            if ((a.Type == ValueType.Int32 || a.Type == ValueType.Double) && (b.Type == ValueType.Int32 || b.Type == ValueType.Double))
             {
-                throw new ValueConversionException("Value is not a numerical!");
+                if (a.Type == ValueType.Double || b.Type == ValueType.Double)
+                {
+                    return new Value(a.doubleValue % b.doubleValue, ValueType.Double);
+                }
+                else
+                {
+                    return new Value(a.intValue % b.intValue, ValueType.Int32);
+                }
             }
 
-            if (b.Type != ValueType.Int32 && b.Type != ValueType.Double)
-            {
-                throw new ValueConversionException("Value is not a numerical!");
-            }
-
-            return new Value(a.Data % b.Data, a.Type >= b.Type ? a.Type : b.Type);
+            throw new ValueConversionException("Value is not a numerical!");
         }
 
-        public static Value operator&(Value a, Value b)
+        public static Value operator &(Value a, Value b)
         {
             if (a.Type != ValueType.Int32 || b.Type != ValueType.Int32)
             {
                 throw new ValueConversionException("Value is not AND-able!");
             }
 
-            return new Value(a.Data % b.Data, ValueType.Int32);
+            return new Value(a.intValue & b.intValue, ValueType.Int32);
         }
 
         public static Value operator |(Value a, Value b)
@@ -191,7 +270,7 @@ namespace Diannex.NET
                 throw new ValueConversionException("Value is not OR-able!");
             }
 
-            return new Value(a.Data | b.Data, ValueType.Int32);
+            return new Value(a.intValue | b.intValue, ValueType.Int32);
         }
 
         public static Value operator ^(Value a, Value b)
@@ -201,7 +280,7 @@ namespace Diannex.NET
                 throw new ValueConversionException("Value is not XOR-able!");
             }
 
-            return new Value(a.Data ^ b.Data, ValueType.Int32);
+            return new Value(a.intValue ^ b.intValue, ValueType.Int32);
         }
 
         public static Value operator ~(Value a)
@@ -211,7 +290,7 @@ namespace Diannex.NET
                 throw new ValueConversionException("Value is not Negate-able!");
             }
 
-            return new Value(~a.Data, ValueType.Int32);
+            return new Value(~a.intValue, ValueType.Int32);
         }
 
         public static Value operator <<(Value a, int b)
@@ -221,7 +300,7 @@ namespace Diannex.NET
                 throw new ValueConversionException("Value is not LSHIFTable!");
             }
 
-            return new Value(a.Data << b, ValueType.Int32);
+            return new Value(a.intValue << b, ValueType.Int32);
         }
 
         public static Value operator >>(Value a, int b)
@@ -231,7 +310,7 @@ namespace Diannex.NET
                 throw new ValueConversionException("Value is not RSHIFTable!");
             }
 
-            return new Value(a.Data >> b, ValueType.Int32);
+            return new Value(a.intValue >> b, ValueType.Int32);
         }
 
         public static Value operator ==(Value a, Value b)
@@ -241,81 +320,83 @@ namespace Diannex.NET
                 return new Value(0, ValueType.Int32);
             }
 
-            return new Value(a.Data == b.Data ? 1 : 0, ValueType.Int32);
+            return a.Type switch
+            {
+                ValueType.String => new Value(a.stringValue == b.stringValue ? 1 : 0, ValueType.Int32),
+                ValueType.Int32 => new Value(a.intValue == b.intValue ? 1 : 0, ValueType.Int32),
+                ValueType.Double => new Value(a.doubleValue == b.doubleValue ? 1.0 : 0.0, ValueType.Double),
+                ValueType.Array => new Value(a.arrayValue == b.arrayValue ? 1 : 0, ValueType.Int32),
+                _ => new Value(0, ValueType.Int32),
+            };
         }
 
         public static Value operator !=(Value a, Value b)
         {
-            return new Value(!(a == b), ValueType.Int32);
+            return new Value((!(a == b)).intValue, ValueType.Int32);
         }
 
         public static Value operator <(Value a, Value b)
         {
-            if (a.Type != ValueType.Int32 && a.Type != ValueType.Double)
+            if ((a.Type == ValueType.Int32 || a.Type == ValueType.Double) && (b.Type == ValueType.Int32 || b.Type == ValueType.Double))
             {
-                throw new ValueConversionException("Value is not comparable!");
+                return new Value(
+                    (a.Type == ValueType.Int32 ? a.intValue : a.doubleValue) <
+                    (b.Type == ValueType.Int32 ? b.intValue : b.doubleValue) ? 1 : 0,
+                    ValueType.Int32);
             }
 
-            if (b.Type != ValueType.Int32 && b.Type != ValueType.Double)
-            {
-                throw new ValueConversionException("Value is not comparable!");
-            }
-
-            return new Value(a.Data < b.Data ? 1 : 0, ValueType.Int32);
+            throw new ValueConversionException("Value is not comparable!");
         }
 
         public static explicit operator bool(Value a)
         {
-            if (a.Type == ValueType.Double || a.Type == ValueType.Int32)
-                return a.Data > 0;
-            if (a.Type == ValueType.String || a.Type == ValueType.Array)
-                return a.Data.Length > 0;
-            return false;
+            return a.Type switch
+            {
+                ValueType.String => a.stringValue.Length > 0,
+                ValueType.Int32 => a.intValue > 0,
+                ValueType.Double => a.doubleValue > 0,
+                ValueType.Array => a.arrayValue.Length > 0,
+                _ => false,
+            };
         }
 
         public static Value operator >(Value a, Value b)
         {
-            if (a.Type != ValueType.Int32 && a.Type != ValueType.Double)
+            if ((a.Type == ValueType.Int32 || a.Type == ValueType.Double) && (b.Type == ValueType.Int32 || b.Type == ValueType.Double))
             {
-                throw new ValueConversionException("Value is not comparable!");
+                return new Value(
+                    (a.Type == ValueType.Int32 ? a.intValue : a.doubleValue) >
+                    (b.Type == ValueType.Int32 ? b.intValue : b.doubleValue) ? 1 : 0,
+                    ValueType.Int32);
             }
 
-            if (b.Type != ValueType.Int32 && b.Type != ValueType.Double)
-            {
-                throw new ValueConversionException("Value is not comparable!");
-            }
-
-            return new Value(a.Data > b.Data ? 1 : 0, ValueType.Int32);
+            throw new ValueConversionException("Value is not comparable!");
         }
 
         public static Value operator <=(Value a, Value b)
         {
-            if (a.Type != ValueType.Int32 && a.Type != ValueType.Double)
+            if ((a.Type == ValueType.Int32 || a.Type == ValueType.Double) && (b.Type == ValueType.Int32 || b.Type == ValueType.Double))
             {
-                throw new ValueConversionException("Value is not comparable!");
+                return new Value(
+                    (a.Type == ValueType.Int32 ? a.intValue : a.doubleValue) <=
+                    (b.Type == ValueType.Int32 ? b.intValue : b.doubleValue) ? 1 : 0,
+                    ValueType.Int32);
             }
 
-            if (b.Type != ValueType.Int32 && b.Type != ValueType.Double)
-            {
-                throw new ValueConversionException("Value is not comparable!");
-            }
-
-            return new Value(a.Data <= b.Data ? 1 : 0, ValueType.Int32);
+            throw new ValueConversionException("Value is not comparable!");
         }
 
         public static Value operator >=(Value a, Value b)
         {
-            if (a.Type != ValueType.Int32 && a.Type != ValueType.Double)
+            if ((a.Type == ValueType.Int32 || a.Type == ValueType.Double) && (b.Type == ValueType.Int32 || b.Type == ValueType.Double))
             {
-                throw new ValueConversionException("Value is not comparable!");
+                return new Value(
+                    (a.Type == ValueType.Int32 ? a.intValue : a.doubleValue) >=
+                    (b.Type == ValueType.Int32 ? b.intValue : b.doubleValue) ? 1 : 0,
+                    ValueType.Int32);
             }
 
-            if (b.Type != ValueType.Int32 && b.Type != ValueType.Double)
-            {
-                throw new ValueConversionException("Value is not comparable!");
-            }
-
-            return new Value(a.Data >= b.Data ? 1 : 0, ValueType.Int32);
+            throw new ValueConversionException("Value is not comparable!");
         }
 
         public override bool Equals(object obj)
@@ -330,15 +411,19 @@ namespace Diannex.NET
 
         public override int GetHashCode()
         {
-            return Data.GetHashCode();
+            return Type switch
+            {
+                ValueType.String => stringValue.GetHashCode(),
+                ValueType.Int32 => intValue.GetHashCode(),
+                ValueType.Double => doubleValue.GetHashCode(),
+                ValueType.Array => arrayValue.GetHashCode(),
+                _ => base.GetHashCode(),
+            };
         }
 
         public class ValueConversionException : Exception
         {
-            public ValueConversionException(string message) : base(message)
-            {
-
-            }
+            public ValueConversionException(string message) : base(message) { }
         }
     }
 }
