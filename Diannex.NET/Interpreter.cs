@@ -9,27 +9,86 @@ using System.Text.RegularExpressions;
 
 namespace Diannex.NET
 {
+    /// <summary>
+    /// The Interpreter for the Diannex bytecode.
+    /// </summary>
     public class Interpreter
     {
+        /// <summary>
+        /// A method used to randomly decide if a Choice/Choose option will be displayed.
+        /// </summary>
+        /// <param name="chance">The normalized chance of being displayed.<br/>By default it's 1 if no chances were declared.</param>
+        /// <returns>Whether or not the Choice/Choose option should be displayed.</returns>
         public delegate bool ChanceHandler(double chance);
-        public delegate int WeightedChanceHandler(double[] chance);
+        /// <summary>
+        /// A method used to randomly pick a Choose option.
+        /// </summary>
+        /// <param name="weights">A list of normalized weights for each Choose option.<br/>By default a weight is 1 if no weight was specified for that specific Choose option.</param>
+        /// <returns>Which Choose option to select.</returns>
+        public delegate int WeightedChanceHandler(double[] weights);
 
+        /// <summary>
+        /// A processed representation of the compiled Diannex code.
+        /// </summary>
         public Binary Binary;
+        /// <summary>
+        /// A map of variables that persists between scopes.
+        /// </summary>
         public Dictionary<string, Value> GlobalVariableStore;
+        /// <summary>
+        /// A map of global flags that persists between execution of the same scope.
+        /// </summary>
         public Dictionary<string, Value> Flags;
+        /// <summary>
+        /// See <see cref="Diannex.NET.FunctionHandler"/>.
+        /// </summary>
         public FunctionHandler FunctionHandler;
 
+        /// <summary>
+        /// See <see cref="ChanceHandler"/>.
+        /// </summary>
         public ChanceHandler ChanceCallback;
+        /// <summary>
+        /// See <see cref="WeightedChanceHandler"/>.
+        /// </summary>
         public WeightedChanceHandler WeightedChanceCallback;
+        /// <summary>
+        /// True whenever the Interpreter is processing Choices.
+        /// </summary>
         public bool InChoice { get; private set; }
+        /// <summary>
+        /// True whenever the Interpreter is waiting for the User to select a Choice.
+        /// </summary>
+        /// <remarks>
+        /// See <seealso cref="ChooseChoice(int)"/>.
+        /// </remarks>
         public bool SelectChoice { get; private set; }
+        /// <summary>
+        /// True whenever the Interpreter is waiting for the User to finish displaying <seealso cref="CurrentText"/>.
+        /// </summary>
         public bool RunningText { get; private set; }
+        /// <summary>
+        /// True whenever the Interpreter is waiting for any reason, or if <seealso cref="SceneCompleted"/> is true.
+        /// </summary>
         public bool Paused { get; private set; }
+        /// <summary>
+        /// True whenever the Interpreter is done executing the <seealso cref="CurrentScene"/>.
+        /// </summary>
         public bool SceneCompleted { get; private set; }
+        /// <summary>
+        /// The name of the currently running scene as set by <seealso cref="RunScene(string)"/>.
+        /// </summary>
         public string CurrentScene { get; private set; }
+        /// <summary>
+        /// The line of dialogue to be displayed.
+        /// </summary>
         public string CurrentText { get; private set; }
-        public List<(int /* Relative Address to jump to */, string /* Text to display to the user */)> Choices { get; private set; }
+        /// <summary>
+        /// A list of choices to display to the user to pick from.
+        /// </summary>
+        public List<string> Choices => choices.Select(c => c.Item2).ToList();
 
+        private List<(int /* Relative Address to jump to */, string /* Text to display to the user */)> choices;
         private int instructionPointer;
         private Stack<Value> stack;
         private Value saveRegister;
@@ -38,6 +97,13 @@ namespace Diannex.NET
         private List<(double, int)> chooseOptions;
         private Dictionary<string, string> definitions;
 
+        /// <summary>
+        /// The Interpreter for the Diannex bytecode.
+        /// </summary>
+        /// <param name="binary">The specific Diannex <seealso cref="Diannex.NET.Binary"/> to interpret.</param>
+        /// <param name="functionHandler">Used for executing external methods in Diannex code.</param>
+        /// <param name="chanceCallback">See <see cref="ChanceHandler"/>.</param>
+        /// <param name="weightedChanceCallback">See <see cref="WeightedChanceHandler"/>.</param>
         public Interpreter(Binary binary, FunctionHandler functionHandler, ChanceHandler chanceCallback = null, WeightedChanceHandler weightedChanceCallback = null)
         {
             Binary = binary;
@@ -95,7 +161,7 @@ namespace Diannex.NET
             saveRegister = null;
             localVarStore = new LocalVariableStore(this);
             callStack = new Stack<(int, Stack<Value>, LocalVariableStore)>();
-            Choices = new List<(int, string)>();
+            choices = new List<(int, string)>();
             FunctionHandler = functionHandler;
             chooseOptions = new List<(double, int)>();
             definitions = new Dictionary<string, string>();
@@ -110,11 +176,30 @@ namespace Diannex.NET
             }
         }
 
+        /// <summary>
+        /// Gets a flag from the Diannex Context.
+        /// </summary>
+        /// <remarks>
+        /// NOTE: The Scene/Method where the flag is defined <b>MUST BE EXECUTED FIRST</b> before the flag will populate.
+        /// </remarks>
+        /// <param name="flag">The flag to get.</param>
+        /// <returns>The flag as a <seealso cref="Value"/>.</returns>
         public Value GetFlag(string flag)
         {
             return Flags[flag];
         }
 
+        /// <summary>
+        /// Sets a flag from the Diannex Context.
+        /// </summary>
+        /// <remarks>
+        /// If a flag is set before it is defined (see remark on <seealso cref="GetFlag(string)"/>), then the value will be treated as the default.
+        /// <br/>
+        /// <br/>
+        /// WARNING: The value <b>MUST BE OF THE SAME TYPE</b> as it is defined the code, otherwise undefined behaviour may occur.
+        /// </remarks>
+        /// <param name="flag">The flag to set.</param>
+        /// <param name="value">The <seealso cref="Value"/> to set the flag to.</param>
         public void SetFlag(string flag, Value value)
         {
             Flags[flag] = value;
@@ -186,9 +271,9 @@ namespace Diannex.NET
 
         public void ChooseChoice(int idx)
         {
-            if (idx >= Choices.Count)
+            if (idx >= choices.Count)
                 throw new IndexOutOfRangeException($"Choice at index {idx} is outside of the range of choices.");
-            var (ip,_) = Choices[idx];
+            var (ip,_) = choices[idx];
             instructionPointer = ip;
             SelectChoice = false;
             Paused = false;
@@ -567,7 +652,7 @@ namespace Diannex.NET
                 var text = stack.Pop();
                 var rand = new Random();
                 if (ChanceCallback(chance.DoubleValue))
-                    Choices.Add((instructionPointer + arg1, text.StringValue));
+                    choices.Add((instructionPointer + arg1, text.StringValue));
             }
             if (opcode == Opcode.ChoiceAddTruthy)
             {
@@ -580,14 +665,14 @@ namespace Diannex.NET
                 var rand = new Random();
                 if ((bool)condition && ChanceCallback(chance.DoubleValue))
                 {
-                    Choices.Add((instructionPointer + arg1, text.StringValue));
+                    choices.Add((instructionPointer + arg1, text.StringValue));
                 }
             }
             if (opcode == Opcode.ChoiceSelect)
             {
                 if (!InChoice)
                     throw new InterpreterRuntimeException("Attempted to wait for user choice when no choice is being processed!");
-                if (Choices.Count == 0)
+                if (choices.Count == 0)
                     throw new InterpreterRuntimeException("Attempted to wait for user choice when there's no choices to choose!");
 
                 SelectChoice = true;
@@ -618,6 +703,25 @@ namespace Diannex.NET
                 Paused = true;
             }
             #endregion
+        }
+
+        /// <summary>
+        /// Retrieves a definition from the Diannex code
+        /// </summary>
+        /// <remarks>
+        /// NOTE: Definitions are loaded when the Interpreter is constructed if the binary
+        /// was created with no private/public translation files.<br/>Otherwise, they will be loaded
+        /// whenever the <seealso cref="LoadTranslationFile(string)"/> method is called.
+        /// <br/>
+        /// <b>THIS MEANS INTERPOLATED STRINGS IN DEFINITIONS WON'T CHANGE UNTIL THEY'RE LOADED AGAIN.</b>
+        /// </remarks>
+        /// <param name="defname">The symbol name of the definition (e.g. "definitions.main")</param>
+        /// <returns>The value of the definition, which will always be a string.</returns>
+        public string GetDefinition(string defname)
+        {
+            if (definitions.ContainsKey(defname))
+                return definitions[defname];
+            return GetDefinition(LookupDefinition(defname));
         }
 
         private Value ConstructArray(int elementCount)
@@ -652,7 +756,7 @@ namespace Diannex.NET
             return string.Format(Regex.Replace(format, @"\$({.*?})", "$1"), args);
         }
 
-        public int LookupScene(string sceneName)
+        private int LookupScene(string sceneName)
         {
             int id = LookupString(sceneName);
             if (id == -1)
@@ -669,7 +773,7 @@ namespace Diannex.NET
             return scene;
         }
 
-        public int LookupFunction(string funcName)
+        private int LookupFunction(string funcName)
         {
             int id = LookupString(funcName);
             if (id == -1)
@@ -686,7 +790,7 @@ namespace Diannex.NET
             return func;
         }
 
-        public (int, int, int) LookupDefinition(string defName)
+        private (int, int, int) LookupDefinition(string defName)
         {
             int id = LookupString(defName);
             if (id == -1)
@@ -719,19 +823,13 @@ namespace Diannex.NET
             instructionPointer = iptemp;
             return ret;
         }
-        
-        public string GetDefinition(string defname)
-        {
-            if (definitions.ContainsKey(defname))
-                return definitions[defname];
-            return GetDefinition(LookupDefinition(defname));
-        }
 
-        public int LookupString(string str)
+        private int LookupString(string str)
         {
             return Binary.StringTable.FindIndex(s => s == str);
         }
 
+#if DEBUG
         public string Dissassemble(int idx)
         {
             StringBuilder d = new StringBuilder();
@@ -937,6 +1035,7 @@ namespace Diannex.NET
                 _ => "nop",
             };
         }
+#endif
 
         public class InterpreterRuntimeException : Exception
         {
