@@ -12,7 +12,7 @@ namespace Diannex.NET
         private Dictionary<string, Func<Value[], Value>> funcs = new Dictionary<string, Func<Value[], Value>>();
 
         /// <summary>
-        /// The Interpreter for the Diannex bytecode.
+        /// Holds external Diannex functions to be invoked by the Interpreter.
         /// </summary>
         /// <param name="withAttributes">Specifies whether to automatically register methods with <seealso cref="DiannexFunctionAttribute"/></param>
         public FunctionHandler(bool withAttributes = true)
