@@ -333,6 +333,11 @@ namespace Diannex.NET
                 Value val1 = stack.Pop(), val2 = stack.Pop();
                 stack.Push(val2 / val1);
             }
+            if (opcode == Opcode.Modulo)
+            {
+                Value val1 = stack.Pop(), val2 = stack.Pop();
+                stack.Push(val2 % val1);
+            }
             if (opcode == Opcode.Negate)
                 stack.Push(-stack.Pop());
             if (opcode == Opcode.Invert)
