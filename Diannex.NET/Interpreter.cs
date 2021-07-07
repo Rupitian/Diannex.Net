@@ -36,7 +36,7 @@ namespace Diannex.NET
         private LocalVariableStore localVarStore;
         private Stack<(int, Stack<Value>, LocalVariableStore)> callStack;
         private List<(double, int)> chooseOptions;
-        private bool handlingFlag;
+        private Dictionary<string, string> definitions;
 
         public Interpreter(Binary binary, FunctionHandler functionHandler, ChanceHandler chanceCallback = null, WeightedChanceHandler weightedChanceCallback = null)
         {
@@ -46,7 +46,6 @@ namespace Diannex.NET
             InChoice = false;
             SelectChoice = false;
             RunningText = false;
-            handlingFlag = false;
             
             if (chanceCallback == null)
                 ChanceCallback = (d) => d == 1 || new Random().NextDouble() < d;
@@ -99,6 +98,16 @@ namespace Diannex.NET
             Choices = new List<(int, string)>();
             FunctionHandler = functionHandler;
             chooseOptions = new List<(double, int)>();
+            definitions = new Dictionary<string, string>();
+
+            if (Binary.TranslationLoaded)
+            {
+                foreach (var def in Binary.Definitions)
+                {
+                    string val = GetDefinition(def);
+                    definitions.Add(Binary.StringTable[def.Item1], val);
+                }
+            }
         }
 
         public Value GetFlag(string flag)
@@ -114,8 +123,27 @@ namespace Diannex.NET
         public void LoadTranslationFile(string path)
         {
             using StreamReader reader = new StreamReader(File.OpenRead(path));
-            Binary.TranslationTable = reader.ReadToEnd().Split('\n').ToList();
+            Binary.TranslationTable =
+                reader
+                    .ReadToEnd()
+                    .Split('\n')
+                    .Where(s => !s.StartsWith('#') && !s.StartsWith('@') && !string.IsNullOrWhiteSpace(s))
+                    .Select(s => s[1..^1])
+                    .ToList();
             Binary.TranslationLoaded = true;
+            foreach (var def in Binary.Definitions)
+            {
+                string name = Binary.StringTable[def.Item1];
+                string val = GetDefinition(def);
+                if (definitions.ContainsKey(name))
+                {
+                    definitions[name] = val;
+                }
+                else
+                {
+                    definitions.Add(name, val);
+                }
+            }
         }
 
         public void RunScene(string sceneName)
@@ -124,40 +152,35 @@ namespace Diannex.NET
             {
                 Console.Error.WriteLine("[WARNING]: Currently no translations have been loaded! The program will crash when trying to run dialogue!");
             }
-            Paused = false;
 
             var sceneId = LookupScene(sceneName);
             var scene = Binary.Scenes[sceneId];
             var bytecodeIndexes = scene.Item2;
-            instructionPointer = bytecodeIndexes[0];
-            for (int i = 1, flagIndex = 0; i < bytecodeIndexes.Count; i += 2, flagIndex++)
+            localVarStore = new LocalVariableStore(this);
+            stack = new Stack<Value>();
+            for (int i = 1, flagIndex = 0; i < bytecodeIndexes.Count; flagIndex++)
             {
-                #region Flag Expression
-                callStack.Push((instructionPointer, stack, localVarStore));
-                instructionPointer = bytecodeIndexes[i];
-                stack = new Stack<Value>();
-                localVarStore = new LocalVariableStore(this);
-                handlingFlag = true;
-                while (handlingFlag)
+                instructionPointer = bytecodeIndexes[i++];
+                Paused = false;
+                while (!Paused)
                     Update();
                 var value = stack.Pop();
-                #endregion
 
-                #region Flag Name
-                callStack.Push((instructionPointer, stack, localVarStore));
-                instructionPointer = bytecodeIndexes[i + 1];
-                stack = new Stack<Value>();
-                localVarStore = new LocalVariableStore(this);
-                handlingFlag = true;
-                while (handlingFlag)
+                instructionPointer = bytecodeIndexes[i++];
+                Paused = false;
+                while (!Paused)
                     Update();
                 var name = stack.Pop();
-                #endregion
 
-                SetFlag(name.StringValue, value);
+                if (!Flags.ContainsKey(name.StringValue))
+                {
+                    SetFlag(name.StringValue, value);
+                }
                 localVarStore.FlagMap.Add(flagIndex, name.StringValue);
             }
-            instructionPointer = scene.Item2[0];
+
+            Paused = false;
+            instructionPointer = bytecodeIndexes[0];
             CurrentScene = sceneName;
         }
 
@@ -165,8 +188,8 @@ namespace Diannex.NET
         {
             if (idx >= Choices.Count)
                 throw new IndexOutOfRangeException($"Choice at index {idx} is outside of the range of choices.");
-            var choice = Choices[idx];
-            idx = choice.Item1;
+            var (ip,_) = Choices[idx];
+            instructionPointer = ip;
             SelectChoice = false;
             Paused = false;
         }
@@ -184,7 +207,6 @@ namespace Diannex.NET
         {
             if (Paused) return;
 
-            var ip = instructionPointer;
             var opcode = (Opcode)Binary.Instructions[instructionPointer++];
             int arg1 = default, arg2 = default;
             double argDouble = default;
@@ -435,11 +457,11 @@ namespace Diannex.NET
 
             #region Instruction Pointer Modification
             if (opcode == Opcode.Jump)
-                instructionPointer = ip + arg1;
+                instructionPointer += arg1;
             if (opcode == Opcode.JumpTruthy && (bool)stack.Pop())
-                instructionPointer = ip + arg1;
+                instructionPointer += arg1;
             if (opcode == Opcode.JumpFalsey && !((bool)stack.Pop()))
-                instructionPointer = ip + arg1;
+                instructionPointer += arg1;
             if (opcode == Opcode.Exit)
             {
                 localVarStore.Clear();
@@ -467,8 +489,6 @@ namespace Diannex.NET
                 stack = cs.Item2;
                 localVarStore = cs.Item3;
                 stack.Push(returnVal);
-                if (handlingFlag)
-                    handlingFlag = false;
             }
             if (opcode == Opcode.Call)
             {
@@ -477,10 +497,42 @@ namespace Diannex.NET
                 {
                     val[i] = stack.Pop();
                 }
-                callStack.Push((instructionPointer, stack, localVarStore));
-                instructionPointer = Binary.Functions[arg1].Item2[0];
+                
+                var temp = new Stack<(int, Stack<Value>, LocalVariableStore)>(callStack);
+                temp.Push((instructionPointer, stack, localVarStore));
+                callStack.Clear();
                 stack = new Stack<Value>();
                 localVarStore = new LocalVariableStore(this);
+                var bytecodeIndexes = Binary.Functions[arg1].Item2;
+                for (int i = 1, flagIndex = 0; i < bytecodeIndexes.Count; i += 2, flagIndex++)
+                {
+                    instructionPointer = bytecodeIndexes[i];
+                    Paused = false;
+                    while (!Paused)
+                    {
+                        Update();
+                    }
+                    var value = stack.Pop();
+
+                    instructionPointer = bytecodeIndexes[i + 1];
+                    Paused = false;
+                    while (!Paused)
+                    {
+                        Update();
+                    }
+                    var name = stack.Pop();
+
+                    if (!Flags.ContainsKey(name.StringValue))
+                    {
+                        SetFlag(name.StringValue, value);
+                    }
+                    localVarStore.FlagMap.Add(flagIndex, name.StringValue);
+                }
+
+                Paused = false;
+                callStack = temp;
+                instructionPointer = bytecodeIndexes[0];
+
                 for (int i = 0; i < arg2; i++)
                 {
                     localVarStore.Add(val[i]);
@@ -515,7 +567,7 @@ namespace Diannex.NET
                 var text = stack.Pop();
                 var rand = new Random();
                 if (ChanceCallback(chance.DoubleValue))
-                    Choices.Add((ip + arg1, text.StringValue));
+                    Choices.Add((instructionPointer + arg1, text.StringValue));
             }
             if (opcode == Opcode.ChoiceAddTruthy)
             {
@@ -528,7 +580,7 @@ namespace Diannex.NET
                 var rand = new Random();
                 if ((bool)condition && ChanceCallback(chance.DoubleValue))
                 {
-                    Choices.Add((ip + arg1, text.StringValue));
+                    Choices.Add((instructionPointer + arg1, text.StringValue));
                 }
             }
             if (opcode == Opcode.ChoiceSelect)
@@ -546,7 +598,7 @@ namespace Diannex.NET
             {
                 var chance = stack.Pop();
                 if (opcode != Opcode.ChooseAddTruthy || (bool)stack.Pop())
-                    chooseOptions.Add((chance.DoubleValue, ip + arg1));
+                    chooseOptions.Add((chance.DoubleValue, instructionPointer + arg1));
             }
 
             if (opcode == Opcode.ChooseSel)
@@ -634,7 +686,7 @@ namespace Diannex.NET
             return func;
         }
 
-        public int LookupDefinition(string defName)
+        public (int, int, int) LookupDefinition(string defName)
         {
             int id = LookupString(defName);
             if (id == -1)
@@ -642,13 +694,37 @@ namespace Diannex.NET
                 throw new InterpreterRuntimeException("Function could not be found!");
             }
 
-            var def = Binary.Definitions.FindIndex(s => s.Item1 == id);
-            if (def == -1)
+            var def = Binary.Definitions.Find(s => s.Item1 == id);
+            if (def == default)
             {
                 throw new InterpreterRuntimeException("Function could not be found!");
             }
 
             return def;
+        }
+
+        private string GetDefinition((int, int, int) def)
+        {
+            var (_, strRef, bytecodeIndex) = def;
+            string value = (strRef ^ (1 << 31)) == 0 ? Binary.StringTable[strRef & 0x7FFFFFFF] : Binary.TranslationTable[strRef];
+            if (bytecodeIndex == -1) return value;
+            var iptemp = instructionPointer;
+            instructionPointer = bytecodeIndex;
+            Paused = false;
+            while (!Paused)
+            {
+                Update();
+            }
+            string ret = Interpolate(value, stack.Count);
+            instructionPointer = iptemp;
+            return ret;
+        }
+        
+        public string GetDefinition(string defname)
+        {
+            if (definitions.ContainsKey(defname))
+                return definitions[defname];
+            return GetDefinition(LookupDefinition(defname));
         }
 
         public int LookupString(string str)
@@ -665,6 +741,7 @@ namespace Diannex.NET
                 int arg1 = default, arg2 = default;
                 double argDouble = default;
 
+                d.Append($"{idx-1,3}: ");
                 d.Append(ToAssembledName(opcode));
 
                 switch (opcode)
@@ -717,7 +794,11 @@ namespace Diannex.NET
                     case Opcode.Jump:
                     case Opcode.JumpTruthy:
                     case Opcode.JumpFalsey:
-                        d.Append($" {(arg1 > -1 ? "+" : "")}{arg1}");
+                    case Opcode.ChooseAdd:
+                    case Opcode.ChooseAddTruthy:
+                    case Opcode.ChoiceAdd:
+                    case Opcode.ChoiceAddTruthy:
+                        d.Append($" ${idx + arg1}");
                         break;
                     case Opcode.PushDouble:
                         d.Append($" #{argDouble}");
@@ -765,11 +846,24 @@ namespace Diannex.NET
 
             OrderedDictionary result = new OrderedDictionary();
 
+            foreach (var (symbol, strRef, index) in Binary.Definitions)
+            {
+                string str = (strRef ^ (1 << 31)) == 0 ? Binary.StringTable[strRef & 0x7FFFFFFF] : Binary.TranslationTable[strRef];
+                if (index != -1)
+                {
+                    result.Add(Binary.StringTable[symbol] + $"@{str}", Dissassemble(index).Trim());
+                }
+                else
+                {
+                    result.Add(Binary.StringTable[symbol] + $"@{str}", "");
+                }
+            }
+
             foreach (var (symbol, funcPointers) in list)
             {
                 for (int i = 0; i < funcPointers.Count; ++i)
                 {
-                    result.Add(Binary.StringTable[symbol] + $".{i}", "  " + Dissassemble(funcPointers[i]).Replace("\n", "\n  ").Trim());
+                    result.Add(Binary.StringTable[symbol] + $".{i}", Dissassemble(funcPointers[i]).Trim());
                 }
             }
 
