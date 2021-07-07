@@ -5,10 +5,25 @@ using System.Collections.Generic;
 
 namespace Diannex.NET
 {
+    /// <summary>
+    /// A processed representation of the compiled Diannex code.
+    /// </summary>
     public class Binary
     {
+        /// <summary>
+        /// True if either an internal translation file is loaded, or when an external translation file is loaded.
+        /// </summary>
+        /// <remarks>
+        /// NOTE: If you try to execute code with dialogue when this is false you <b>WILL</b> crash.
+        /// </remarks>
         public bool TranslationLoaded;
+        /// <summary>
+        /// A list of internal strings used in the Diannex code, e.g. function/scene names.
+        /// </summary>
         public List<string> StringTable; // [ID]: <string>
+        /// <summary>
+        /// A list of dialogue and other translatable strings that's displayed to the user.
+        /// </summary>
         public List<string> TranslationTable;
 
         internal byte[] Instructions;
@@ -18,6 +33,9 @@ namespace Diannex.NET
         internal List<(int, List<int>)> Functions;
         internal List<(int, int, int)> Definitions;
 
+        /// <summary>
+        /// <inheritdoc cref="Binary"/>
+        /// </summary>
         public Binary()
         {
             TranslationLoaded = false;
@@ -29,6 +47,12 @@ namespace Diannex.NET
             Definitions = new List<(int, int, int)>();
         }
 
+        /// <summary>
+        /// Loads a Diannex binary from a file.
+        /// </summary>
+        /// <param name="path">Path to the binary file.</param>
+        /// <returns>The processed binary.</returns>
+        /// <exception cref="BinaryReaderException"/>
         public static Binary ReadFromFile(string path)
         {
             Binary b = new Binary();
@@ -149,6 +173,9 @@ namespace Diannex.NET
             return b;
         }
 
+        /// <summary>
+        /// Thrown whenever an error ocurrs in processing of a Diannex binary file.
+        /// </summary>
         public class BinaryReaderException : Exception
         {
             public string File;

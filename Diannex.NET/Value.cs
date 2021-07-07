@@ -4,6 +4,9 @@ using System.Text;
 
 namespace Diannex.NET
 {
+    /// <summary>
+    /// A Diannex Value as seen by the code.
+    /// </summary>
     public class Value
     {
         public enum ValueType
