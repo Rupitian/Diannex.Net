@@ -230,6 +230,9 @@ namespace Diannex.NET
                 return;
 
             #region Stack Instructions
+            if (opcode == Opcode.FreeLocal)
+                localVarStore.Delete(arg1);
+
             if (opcode == Opcode.Save)
                 saveRegister = stack.Peek();
             if (opcode == Opcode.Load)
@@ -889,6 +892,18 @@ namespace Diannex.NET
             {
                 var index = Count;
                 Variables.Add(index, value);
+            }
+
+            public void Delete(int index)
+            {
+                if (index < FlagMap.Count)
+                {
+                    FlagMap.Remove(index);
+                }
+                else if (Variables.ContainsKey(index))
+                {
+                    Variables.Remove(index);
+                }
             }
 
             public void Clear()
