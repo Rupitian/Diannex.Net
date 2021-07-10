@@ -2,6 +2,25 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
+    <Authors>PeriBooty</Authors>
+    <Company>Rupitian</Company>
+    <Description>Diannex.Net is a C# Bytecode Interpreter for the Diannex dialogue language.
+It's meant for use in games, but it can also be used in other applications if so desired.</Description>
+    <Copyright>Copyright (c) 2021 Rupitian</Copyright>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageLicenseExpression></PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Rupitian/Diannex.Net</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Rupitian/Diannex.Net</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>games game gameengine dialogue diannex rupitian visualnovel visual novel</PackageTags>
+    <PackageReleaseNotes>The first feature complete release of Diannex.Net</PackageReleaseNotes>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
 
 </Project>
