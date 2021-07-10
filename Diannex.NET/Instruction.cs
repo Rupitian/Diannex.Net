@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Diannex.NET
+﻿namespace Diannex.NET
 {
     public enum Opcode
     {
