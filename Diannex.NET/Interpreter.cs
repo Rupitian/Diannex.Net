@@ -782,7 +782,11 @@ namespace Diannex.NET
                 };
             }
 
-            return string.Format(Regex.Replace(format, @"\$({.*?})", "$1"), args);
+            // Replace an escaped interpolated ("\${}") with the escaped format equivalent ("{{}}")
+            format = Regex.Replace(format, @"\\\$({.*?})", "{$1}");
+            // Replace an interpolation ("${}") with the format equivalent ("{}")
+            format = Regex.Replace(format, @"\$({.*?})", "$1");
+            return string.Format(format, args);
         }
 
         private int LookupScene(string sceneName)
