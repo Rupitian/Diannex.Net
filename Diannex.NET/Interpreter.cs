@@ -679,7 +679,6 @@ namespace Diannex.NET
 
                 var chance = stack.Pop();
                 var text = stack.Pop();
-                var rand = new Random();
                 if (ChanceCallback(chance.DoubleValue))
                     choices.Add((instructionPointer + arg1, text.StringValue));
             }
@@ -691,7 +690,6 @@ namespace Diannex.NET
                 var chance = stack.Pop();
                 var text = stack.Pop();
                 var condition = stack.Pop();
-                var rand = new Random();
                 if ((bool)condition && ChanceCallback(chance.DoubleValue))
                 {
                     choices.Add((instructionPointer + arg1, text.StringValue));
