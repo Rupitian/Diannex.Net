@@ -780,10 +780,12 @@ namespace Diannex.NET
                 };
             }
 
-            // Replace an escaped interpolated ("\${}") with the escaped format equivalent ("{{}}")
-            format = Regex.Replace(format, @"\\\$({.*?})", "{$1}");
             // Replace an interpolation ("${}") with the format equivalent ("{}")
-            format = Regex.Replace(format, @"\$({.*?})", "$1");
+            format = Regex.Replace(@"(?<!\\)\$({.*?})", "$1");
+
+            // Replace an escaped interpolation ("\${}") with the escaped format equivalent, preserving the $ ("${{}}")
+            format = Regex.Replace(format @"\\\$({.*?})", "${$1}");
+
             return string.Format(format, args);
         }
 
