@@ -361,375 +361,380 @@ namespace Diannex.NET
                     break;
             }
 
-            // Prepare for if statement fuck storm
-            if (opcode == Opcode.Nop)
-                return;
+            // Prepare for switch statement fuck storm
+            switch (opcode)
+            {
+                case Opcode.Nop:
+                    return;
 
-            #region Stack Instructions
-            if (opcode == Opcode.FreeLocal)
-                localVarStore.Delete(arg1);
-
-            if (opcode == Opcode.Save)
-                saveRegister = stack.Peek();
-            if (opcode == Opcode.Load)
-                stack.Push(new Value(saveRegister));
-
-            if (opcode == Opcode.PushUndefined)
-                stack.Push(new Value());
-            if (opcode == Opcode.PushInt)
-                stack.Push(new Value(arg1, Value.ValueType.Int32));
-            if (opcode == Opcode.PushDouble)
-                stack.Push(new Value(argDouble, Value.ValueType.Double));
-
-            if (opcode == Opcode.PushString)
-                stack.Push(new Value(Binary.TranslationTable[arg1], Value.ValueType.String));
-            if (opcode == Opcode.PushInterpolatedString)
-                stack.Push(new Value(Interpolate(Binary.TranslationTable[arg1], arg2), Value.ValueType.String));
-            if (opcode == Opcode.PushBinaryString)
-                stack.Push(new Value(Binary.StringTable[arg1], Value.ValueType.String));
-            if (opcode == Opcode.PushBinaryInterpolatedString)
-                stack.Push(new Value(Interpolate(Binary.StringTable[arg1], arg2), Value.ValueType.String));
-
-            if (opcode == Opcode.MakeArray)
-                stack.Push(ConstructArray(arg1));
-            if (opcode == Opcode.PushArrayIndex)
-            {
-                var indx = stack.Pop();
-                var arr = stack.Pop();
-                stack.Push(arr.ArrayValue[indx.IntValue]);
-            }
-            if (opcode == Opcode.SetArrayIndex)
-            {
-                var val = stack.Pop();
-                var indx = stack.Pop();
-                var arr = stack.Pop();
-                arr.ArrayValue[indx.IntValue] = val;
-                stack.Push(arr);
-            }
-
-            if (opcode == Opcode.SetVarGlobal)
-            {
-                var val = stack.Pop();
-                GlobalVariableStore[Binary.StringTable[arg1]] = val;
-            }
-            if (opcode == Opcode.SetVarLocal)
-            {
-                var val = stack.Pop();
-                if (arg1 >= localVarStore.Count)
-                {
-                    int count = arg1 - localVarStore.Count - 1;
-                    for (int i = 0; i < count; i++)
-                        localVarStore.Add(new Value());
-                    localVarStore.Add(val);
-                }
-                else
-                {
-                    localVarStore[arg1] = val;
-                }
-            }
-            if (opcode == Opcode.PushVarGlobal)
-                stack.Push(GlobalVariableStore[Binary.StringTable[arg1]]);
-            if (opcode == Opcode.PushVarLocal)
-                stack.Push(localVarStore[arg1]);
-
-            if (opcode == Opcode.Pop)
-                stack.Pop();
-            if (opcode == Opcode.Duplicate)
-            {
-                var val = stack.Pop();
-                stack.Push(val);
-                stack.Push(val);
-            }
-            if (opcode == Opcode.Duplicate2)
-            {
-                var val1 = stack.Pop();
-                var val2 = stack.Pop();
-                stack.Push(val2);
-                stack.Push(val1);
-                stack.Push(val2);
-                stack.Push(val1);
-            }
-            #endregion
-
-            #region Value Modification
-            if (opcode == Opcode.Addition)
-            {
-                Value val1 = stack.Pop(), val2 = stack.Pop();
-                stack.Push(val2 + val1);
-            }
-            if (opcode == Opcode.Subtraction)
-            {
-                Value val1 = stack.Pop(), val2 = stack.Pop();
-                stack.Push(val2 - val1);
-            }
-            if (opcode == Opcode.Multiply)
-            {
-                Value val1 = stack.Pop(), val2 = stack.Pop();
-                stack.Push(val2 * val1);
-            }
-            if (opcode == Opcode.Divide)
-            {
-                Value val1 = stack.Pop(), val2 = stack.Pop();
-                stack.Push(val2 / val1);
-            }
-            if (opcode == Opcode.Modulo)
-            {
-                Value val1 = stack.Pop(), val2 = stack.Pop();
-                stack.Push(val2 % val1);
-            }
-            if (opcode == Opcode.Negate)
-                stack.Push(-stack.Pop());
-            if (opcode == Opcode.Invert)
-                stack.Push(!stack.Pop());
-
-            if (opcode == Opcode.BitLeftShift)
-            {
-                int shift = stack.Pop().IntValue;
-                var val = stack.Pop();
-                stack.Push(val << shift);
-            }
-            if (opcode == Opcode.BitRightShift)
-            {
-                int shift = stack.Pop().IntValue;
-                var val = stack.Pop();
-                stack.Push(val >> shift);
-            }
-            if (opcode == Opcode.BitAnd)
-            {
-                var val2 = stack.Pop();
-                var val1 = stack.Pop();
-                stack.Push(val1 & val2);
-            }
-            if (opcode == Opcode.BitOr)
-            {
-                var val2 = stack.Pop();
-                var val1 = stack.Pop();
-                stack.Push(val1 | val2);
-            }
-            if (opcode == Opcode.BitExclusiveOr)
-            {
-                var val2 = stack.Pop();
-                var val1 = stack.Pop();
-                stack.Push(val1 ^ val2);
-            }
-            if (opcode == Opcode.BitNegate)
-            {
-                var val = stack.Pop();
-                stack.Push(~val);
-            }
-
-            if (opcode == Opcode.Power)
-            {
-                var val2 = stack.Pop();
-                var val1 = stack.Pop();
-                stack.Push(new Value(
-                            Math.Pow(
-                                val1.DoubleValue,
-                                val2.DoubleValue),
-                            Value.ValueType.Double));
-            }
-            #endregion
-
-            #region Value Comparison
-            if (opcode == Opcode.CompareEqual)
-            {
-                var val2 = stack.Pop();
-                var val1 = stack.Pop();
-                stack.Push(val1 == val2);
-            }
-            if (opcode == Opcode.CompareGreaterThan)
-            {
-                var val2 = stack.Pop();
-                var val1 = stack.Pop();
-                stack.Push(val1 > val2);
-            }
-            if (opcode == Opcode.CompareLessThan)
-            {
-                var val2 = stack.Pop();
-                var val1 = stack.Pop();
-                stack.Push(val1 < val2);
-            }
-            if (opcode == Opcode.CompareGreaterThanEqual)
-            {
-                var val2 = stack.Pop();
-                var val1 = stack.Pop();
-                stack.Push(val1 >= val2);
-            }
-            if (opcode == Opcode.CompareLessThanEqual)
-            {
-                var val2 = stack.Pop();
-                var val1 = stack.Pop();
-                stack.Push(val1 <= val2);
-            }
-            if (opcode == Opcode.CompareNotEqual)
-            {
-                var val2 = stack.Pop();
-                var val1 = stack.Pop();
-                stack.Push(val1 != val2);
-            }
-            #endregion
-
-            #region Instruction Pointer Modification
-            if (opcode == Opcode.Jump)
-                instructionPointer += arg1;
-            if (opcode == Opcode.JumpTruthy && (bool)stack.Pop())
-                instructionPointer += arg1;
-            if (opcode == Opcode.JumpFalsey && !((bool)stack.Pop()))
-                instructionPointer += arg1;
-            if (opcode == Opcode.Exit)
-            {
-                localVarStore.Clear();
-                if (callStack.Count == 0)
-                {
-                    instructionPointer = -1;
-                    Paused = true;
-                    SceneCompleted = true;
-                }
-                else
-                {
-                    var cs = callStack.Pop();
-                    instructionPointer = cs.Item1;
-                    stack = cs.Item2;
-                    localVarStore = cs.Item3;
-                    stack.Push(new Value());
-                }
-            }
-            if (opcode == Opcode.Return)
-            {
-                localVarStore.Clear();
-                var returnVal = stack.Pop();
-                var cs = callStack.Pop();
-                instructionPointer = cs.Item1;
-                stack = cs.Item2;
-                localVarStore = cs.Item3;
-                stack.Push(returnVal);
-            }
-            if (opcode == Opcode.Call)
-            {
-                Value[] val = new Value[arg2];
-                for (int i = 0; i < arg2; i++)
-                {
-                    val[i] = stack.Pop();
-                }
+                #region Stack Instructions
+                case Opcode.FreeLocal:
+                    localVarStore.Delete(arg1);
+                    break;
                 
-                var temp = new Stack<(int, Stack<Value>, LocalVariableStore)>(callStack);
-                temp.Push((instructionPointer, stack, localVarStore));
-                callStack.Clear();
-                stack = new Stack<Value>();
-                localVarStore = new LocalVariableStore(this);
-                var bytecodeIndexes = Binary.Functions[arg1].Item2;
-                for (int i = 1, flagIndex = 0; i < bytecodeIndexes.Count; i += 2, flagIndex++)
-                {
-                    instructionPointer = bytecodeIndexes[i];
-                    Paused = false;
-                    while (!Paused)
+                case Opcode.Save:
+                    saveRegister = stack.Peek();
+                    break;
+                case Opcode.Load:
+                    stack.Push(new Value(saveRegister));
+                    break;
+
+                case Opcode.PushUndefined:
+                    stack.Push(new Value());
+                    break;
+                case Opcode.PushInt:
+                    stack.Push(new Value(arg1, Value.ValueType.Int32));
+                    break;
+                case Opcode.PushDouble:
+                    stack.Push(new Value(argDouble, Value.ValueType.Double));
+                    break;
+
+                case Opcode.PushString:
+                    stack.Push(new Value(Binary.TranslationTable[arg1], Value.ValueType.String));
+                    break;
+                case Opcode.PushInterpolatedString:
+                    stack.Push(new Value(Interpolate(Binary.TranslationTable[arg1], arg2), Value.ValueType.String));
+                    break;
+                case Opcode.PushBinaryString:
+                    stack.Push(new Value(Binary.StringTable[arg1], Value.ValueType.String));
+                    break;
+                case Opcode.PushBinaryInterpolatedString:
+                    stack.Push(new Value(Interpolate(Binary.StringTable[arg1], arg2), Value.ValueType.String));
+                    break;
+
+                case Opcode.MakeArray:
+                    stack.Push(ConstructArray(arg1));
+                    break;
+                case Opcode.PushArrayIndex:
                     {
-                        Update();
+                        var indx = stack.Pop();
+                        var arr = stack.Pop();
+                        stack.Push(arr.ArrayValue[indx.IntValue]);
                     }
-                    var value = stack.Pop();
-
-                    instructionPointer = bytecodeIndexes[i + 1];
-                    Paused = false;
-                    while (!Paused)
+                    break;
+                case Opcode.SetArrayIndex:
                     {
-                        Update();
+                        var val = stack.Pop();
+                        var indx = stack.Pop();
+                        var arr = stack.Pop();
+                        arr.ArrayValue[indx.IntValue] = val;
+                        stack.Push(arr);
                     }
-                    var name = stack.Pop();
+                    break;
 
-                    if (!Flags.ContainsKey(name.StringValue))
+                case Opcode.SetVarGlobal:
+                    GlobalVariableStore[Binary.StringTable[arg1]] = stack.Pop();
+                    break;
+                case Opcode.SetVarLocal:
                     {
-                        SetFlag(name.StringValue, value);
+                        var val = stack.Pop();
+                        if (arg1 >= localVarStore.Count)
+                        {
+                            int count = arg1 - localVarStore.Count - 1;
+                            for (int i = 0; i < count; i++)
+                                localVarStore.Add(new Value());
+                            localVarStore.Add(val);
+                        }
+                        else
+                        {
+                            localVarStore[arg1] = val;
+                        }
                     }
-                    localVarStore.FlagMap.Add(flagIndex, name.StringValue);
-                }
+                    break;
+                case Opcode.PushVarGlobal:
+                    stack.Push(GlobalVariableStore[Binary.StringTable[arg1]]);
+                    break;
+                case Opcode.PushVarLocal:
+                    stack.Push(localVarStore[arg1]);
+                    break;
+                    
+                case Opcode.Pop:
+                    stack.Pop();
+                    break;
+                case Opcode.Duplicate:
+                    {
+                        var val = stack.Pop();
+                        stack.Push(val);
+                        stack.Push(val);
+                    }
+                    break;
+                case Opcode.Duplicate2:
+                    {
+                        var val1 = stack.Pop();
+                        var val2 = stack.Pop();
+                        stack.Push(val2);
+                        stack.Push(val1);
+                        stack.Push(val2);
+                        stack.Push(val1);
+                    }
+                    break;
+                #endregion
 
-                Paused = false;
-                callStack = temp;
-                instructionPointer = bytecodeIndexes[0];
+                #region Value Modification
+                case Opcode.Addition:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 + val1);
+                    }
+                    break;
+                case Opcode.Subtraction:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 - val1);
+                    }
+                    break;
+                case Opcode.Multiply:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 * val1);
+                    }
+                    break;
+                case Opcode.Divide:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 / val1);
+                    }
+                    break;
+                case Opcode.Modulo:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 % val1);
+                    }
+                    break;
+                case Opcode.Negate:
+                    stack.Push(-stack.Pop());
+                    break;
+                case Opcode.Invert:
+                    stack.Push(!stack.Pop());
+                    break;
 
-                for (int i = 0; i < arg2; i++)
-                {
-                    localVarStore.Add(val[i]);
-                }
+                case Opcode.BitLeftShift:
+                    {
+                        int shift = stack.Pop().IntValue;
+                        var val = stack.Pop();
+                        stack.Push(val << shift);
+                    }
+                    break;
+                case Opcode.BitRightShift:
+                    {
+                        int shift = stack.Pop().IntValue;
+                        var val = stack.Pop();
+                        stack.Push(val >> shift);
+                    }
+                    break;
+                case Opcode.BitAnd:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 & val1);
+                    }
+                    break;
+                case Opcode.BitOr:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 | val1);
+                    }
+                    break;
+                case Opcode.BitExclusiveOr:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 ^ val1);
+                    }
+                    break;
+                case Opcode.BitNegate:
+                    stack.Push(~stack.Pop());
+                    break;
+
+                case Opcode.Power:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(new Value(Math.Pow(val2.DoubleValue, val1.DoubleValue), Value.ValueType.Double));
+                    }
+                    break;
+                #endregion
+
+                #region Value Comparison
+                case Opcode.CompareEqual:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 == val1);
+                    }
+                    break;
+                case Opcode.CompareGreaterThan:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 > val1);
+                    }
+                    break;
+                case Opcode.CompareLessThan:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 < val1);
+                    }
+                    break;
+                case Opcode.CompareGreaterThanEqual:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 >= val1);
+                    }
+                    break;
+                case Opcode.CompareLessThanEqual:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 <= val1);
+                    }
+                    break;
+                case Opcode.CompareNotEqual:
+                    {
+                        Value val1 = stack.Pop(), val2 = stack.Pop();
+                        stack.Push(val2 != val1);
+                    }
+                    break;
+                #endregion
+
+                #region Instruction Pointer Modification
+                case Opcode.Jump:
+                case Opcode.JumpTruthy when (bool)stack.Pop():
+                case Opcode.JumpFalsey when !((bool)stack.Pop()):
+                    instructionPointer += arg1;
+                    break;
+                case Opcode.Exit:
+                    localVarStore.Clear();
+                    if (callStack.Count == 0)
+                    {
+                        instructionPointer = -1;
+                        Paused = true;
+                        SceneCompleted = true;
+                    }
+                    else
+                    {
+                        var cs = callStack.Pop();
+                        instructionPointer = cs.Item1;
+                        stack = cs.Item2;
+                        localVarStore = cs.Item3;
+                        stack.Push(new Value());
+                    }
+                    break;
+                case Opcode.Return:
+                    {
+                        localVarStore.Clear();
+                        var ret = stack.Pop();
+                        var cs = callStack.Pop();
+                        instructionPointer = cs.Item1;
+                        stack = cs.Item2;
+                        localVarStore = cs.Item3;
+                        stack.Push(ret);
+                    }
+                    break;
+                case Opcode.Call:
+                    {
+                        var val = new Value[arg2];
+                        for (int i = 0; i < arg2; i++)
+                            val[i] = stack.Pop();
+
+                        var temp = new Stack<(int, Stack<Value>, LocalVariableStore)>(callStack);
+                        temp.Push((instructionPointer, stack, localVarStore));
+                        callStack.Clear();
+                        stack = new Stack<Value>();
+                        localVarStore = new LocalVariableStore(this);
+                        var bytecodeIndices = Binary.Functions[arg1].Item2;
+                        for (int i = 1, flagIndex = 0; i < bytecodeIndices.Count; i += 2, flagIndex++)
+                        {
+                            instructionPointer = bytecodeIndices[i];
+                            Paused = false;
+                            while (!Paused)
+                                Update();
+                            var value = stack.Pop();
+
+                            instructionPointer = bytecodeIndices[i + 1];
+                            Paused = false;
+                            while (!Paused)
+                                Update();
+                            var name = stack.Pop();
+
+                            if (!Flags.ContainsKey(name.StringValue))
+                                SetFlag(name.StringValue, value);
+                            localVarStore.FlagMap.Add(flagIndex, name.StringValue);
+                        }
+
+                        Paused = false;
+                        callStack = temp;
+                        instructionPointer = bytecodeIndices[0];
+
+                        for (int i = 0; i < arg2; ++i)
+                            localVarStore.Add(val[i]);
+                    }
+                    break;
+                case Opcode.CallExternal:
+                    {
+                        string name = Binary.StringTable[arg1];
+                        var val = new Value[arg2];
+                        for (int i = 0; i < arg2; i++)
+                            val[i] = stack.Pop();
+                        stack.Push(FunctionHandler.Invoke(name, val));
+                    }
+                    break;
+                #endregion
+
+                #region Choice/Choose
+                case Opcode.ChoiceBegin:
+                    if (InChoice)
+                        throw new InterpreterRuntimeException("Choice begins while another choice is being processed!");
+                    InChoice = true;
+                    break;
+                case Opcode.ChoiceAdd:
+                    if (!InChoice)
+                        throw new InterpreterRuntimeException("Attempted to add a choice when no choice is being processed!");
+                    if (ChanceCallback(stack.Pop().DoubleValue))
+                        choices.Add((instructionPointer + arg1, stack.Pop().StringValue));
+                    break;
+                case Opcode.ChoiceAddTruthy:
+                    {
+                        if (!InChoice)
+                            throw new InterpreterRuntimeException("Attempted to add a choice when no choice is being processed!");
+
+                        var chance = stack.Pop();
+                        var text = stack.Pop();
+                        var condititon = stack.Pop();
+                        if ((bool)condititon && ChanceCallback(chance.DoubleValue))
+                            choices.Add((instructionPointer + arg1, text.StringValue));
+                    }
+                    break;
+                case Opcode.ChoiceSelect:
+                    if (!InChoice)
+                        throw new InterpreterRuntimeException("Attempted to wait for user choice when no choice is being processed!");
+                    if (choices.Count == 0)
+                        throw new InterpreterRuntimeException("Attempted to wait for user choice when there's no choices to choose from!");
+
+                    SelectChoice = true;
+                    Paused = true;
+                    break;
+                case Opcode.ChooseAdd:
+                    chooseOptions.Add((stack.Pop().DoubleValue, instructionPointer + arg1));
+                    break;
+                case Opcode.ChooseAddTruthy:
+                    {
+                        var chance = stack.Pop();
+                        if ((bool)stack.Pop())
+                            chooseOptions.Add((chance.DoubleValue, instructionPointer + arg1));
+                    }
+                    break;
+                case Opcode.ChooseSel:
+                    {
+                        var selection = WeightedChanceCallback(chooseOptions.Select(t => t.Item1).ToArray());
+                        if (selection == -1 || selection >= chooseOptions.Count)
+                            throw new IndexOutOfRangeException($"Selection returned by WeightedChanceCallback was out of bounds. Selection: {selection}");
+                        instructionPointer = chooseOptions[selection].Item2;
+                        chooseOptions.Clear();
+                    }
+                    break;
+                #endregion
+
+                case Opcode.TextRun:
+                    CurrentText = stack.Pop().StringValue;
+                    RunningText = true;
+                    Paused = true;
+                    break;
             }
-            if (opcode == Opcode.CallExternal)
-            {
-                string name = Binary.StringTable[arg1];
-                Value[] val = new Value[arg2];
-                for (int i = 0; i < arg2; i++)
-                {
-                    val[i] = stack.Pop();
-                }
-                stack.Push(FunctionHandler.Invoke(name, val));
-            }
-            #endregion
-
-            #region Choice/Choose
-            if (opcode == Opcode.ChoiceBegin)
-            {
-                if (InChoice)
-                    throw new InterpreterRuntimeException("Choice begins while another choice is being processed!");
-
-                InChoice = true;
-            }
-            if (opcode == Opcode.ChoiceAdd)
-            {
-                if (!InChoice)
-                    throw new InterpreterRuntimeException("Attempted to add a choice when no choice is being processed!");
-
-                var chance = stack.Pop();
-                var text = stack.Pop();
-                if (ChanceCallback(chance.DoubleValue))
-                    choices.Add((instructionPointer + arg1, text.StringValue));
-            }
-            if (opcode == Opcode.ChoiceAddTruthy)
-            {
-                if (!InChoice)
-                    throw new InterpreterRuntimeException("Attempted to add a choice when no choice is being processed!");
-
-                var chance = stack.Pop();
-                var text = stack.Pop();
-                var condition = stack.Pop();
-                if ((bool)condition && ChanceCallback(chance.DoubleValue))
-                {
-                    choices.Add((instructionPointer + arg1, text.StringValue));
-                }
-            }
-            if (opcode == Opcode.ChoiceSelect)
-            {
-                if (!InChoice)
-                    throw new InterpreterRuntimeException("Attempted to wait for user choice when no choice is being processed!");
-                if (choices.Count == 0)
-                    throw new InterpreterRuntimeException("Attempted to wait for user choice when there's no choices to choose!");
-
-                SelectChoice = true;
-                Paused = true;
-            }
-
-            if (opcode == Opcode.ChooseAdd || opcode == Opcode.ChooseAddTruthy)
-            {
-                var chance = stack.Pop();
-                if (opcode != Opcode.ChooseAddTruthy || (bool)stack.Pop())
-                    chooseOptions.Add((chance.DoubleValue, instructionPointer + arg1));
-            }
-
-            if (opcode == Opcode.ChooseSel)
-            {
-                var selection = WeightedChanceCallback(chooseOptions.Select(t => t.Item1).ToArray());
-                if (selection == -1 || selection >= chooseOptions.Count)
-                    throw new IndexOutOfRangeException($"Selection returned by WeightedChanceCallback was out of bounds. Selection: {selection}");
-                instructionPointer = chooseOptions[selection].Item2;
-                chooseOptions.Clear();
-            }
-
-            if (opcode == Opcode.TextRun)
-            {
-                var text = stack.Pop();
-                CurrentText = text.StringValue;
-                RunningText = true;
-                Paused = true;
-            }
-            #endregion
         }
 
         /// <summary>
@@ -781,10 +786,10 @@ namespace Diannex.NET
             }
 
             // Replace an interpolation ("${}") with the format equivalent ("{}")
-            format = Regex.Replace(@"(?<!\\)\$({.*?})", "$1");
+            format = Regex.Replace(format, @"(?<!\\)\$({.*?})", "$1");
 
             // Replace an escaped interpolation ("\${}") with the escaped format equivalent, preserving the $ ("${{}}")
-            format = Regex.Replace(format @"\\\$({.*?})", "${$1}");
+            format = Regex.Replace(format, @"\\\$({.*?})", "${$1}");
 
             return string.Format(format, args);
         }
